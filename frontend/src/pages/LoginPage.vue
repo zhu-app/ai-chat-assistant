@@ -1,0 +1,226 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useAuth } from '../composables/useAuth';
+
+const { login, register, authError, isLoading, isLoggedIn } = useAuth();
+
+const emit = defineEmits<{
+  loggedIn: [];
+}>();
+
+const mode = ref<'login' | 'register'>('login');
+const username = ref('');
+const password = ref('');
+const confirmPassword = ref('');
+
+const toggleMode = () => {
+  mode.value = mode.value === 'login' ? 'register' : 'login';
+  authError.value = null;
+};
+
+const handleSubmit = async () => {
+  if (!username.value.trim() || !password.value) return;
+  if (mode.value === 'register' && password.value !== confirmPassword.value) {
+    authError.value = '两次密码不一致';
+    return;
+  }
+
+  let ok: boolean;
+  if (mode.value === 'login') {
+    ok = await login(username.value, password.value);
+  } else {
+    ok = await register(username.value, password.value);
+  }
+  if (ok) {
+    emit('loggedIn');
+  }
+};
+</script>
+
+<template>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-card__header">
+        <div class="login-card__icon">💬</div>
+        <h1>AI Chat</h1>
+        <p class="login-card__subtitle">智能对话 · 知识库 RAG</p>
+      </div>
+
+      <form class="login-card__form" @submit.prevent="handleSubmit">
+        <label class="login-field">
+          <span>用户名</span>
+          <input
+            v-model="username"
+            type="text"
+            placeholder="输入用户名"
+            autocomplete="username"
+            required
+          />
+        </label>
+
+        <label class="login-field">
+          <span>密码</span>
+          <input
+            v-model="password"
+            type="password"
+            placeholder="输入密码"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+
+        <label v-if="mode === 'register'" class="login-field">
+          <span>确认密码</span>
+          <input
+            v-model="confirmPassword"
+            type="password"
+            placeholder="再次输入密码"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+
+        <p v-if="authError" class="login-error">{{ authError }}</p>
+
+        <button type="submit" class="login-button" :disabled="isLoading">
+          {{ isLoading ? '请稍候…' : mode === 'login' ? '登录' : '注册' }}
+        </button>
+      </form>
+
+      <p class="login-card__switch">
+        {{ mode === 'login' ? '还没有账号？' : '已有账号？' }}
+        <button class="login-switch-btn" @click="toggleMode">
+          {{ mode === 'login' ? '注册' : '登录' }}
+        </button>
+      </p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px 32px;
+  box-shadow: var(--shadow-lg);
+}
+
+.login-card__header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-card__icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.login-card__header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.login-card__subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.login-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.login-field input {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.login-field input:focus {
+  border-color: var(--accent);
+}
+
+.login-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.login-button {
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.login-button:hover {
+  background: var(--accent-hover);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-card__switch {
+  text-align: center;
+  margin: 20px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.login-switch-btn {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.login-switch-btn:hover {
+  text-decoration: underline;
+}
+</style>
