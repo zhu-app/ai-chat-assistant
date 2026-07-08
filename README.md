@@ -265,7 +265,7 @@ ALLOWED_DOCUMENT_EXTENSIONS=[".txt",".md",".pdf",".docx"]
 
 ```bash
 cd backend
-python -m unittest discover -s tests -p “test_*.py”
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
 ---
