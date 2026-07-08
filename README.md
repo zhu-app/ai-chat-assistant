@@ -92,7 +92,7 @@ npm run dev -- --host 127.0.0.1 --port 5173
 ```bash
 # 1. 克隆代码到服务器
 git clone <你的仓库地址>
-cd cursor_project_1
+cd ai-chat-assistant
 
 # 2. 配置生产环境变量
 cp backend/.env.production.example backend/.env.production
@@ -178,28 +178,74 @@ sqlite3 backend/data/chat.db "SELECT u.username, COUNT(s.id) as sessions FROM us
 
 ### 开发环境（backend/.env）
 
+详见 `backend/.env.example`：
+
 ```env
-OPENAI_API_KEY=                 # 你的 API Key（不填则走本地模拟）
-OPENAI_MODEL=glm-4-flash        # 模型名
+# ===== 必填 =====
+OPENAI_API_KEY=                           # 你的 API Key
 OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-APP_CORS_ORIGINS=[“http://localhost:5173”, “http://127.0.0.1:5173”]
+
+# ===== 模型 =====
+OPENAI_MODEL=glm-4-flash
+
+# ===== JWT 安全 =====
+JWT_SECRET_KEY=change-me-to-a-random-string   # ⚠️ 生产环境务必修改
+
+# ===== CORS =====
+APP_CORS_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"]
+
+# ===== 持久化 =====
 PERSISTENCE_BACKEND=sqlite
 SQLITE_PATH=data/chat.db
+
+# ===== RAG 知识库 =====
 ENABLE_RAG=true
 RAG_CHUNK_SIZE=800
 RAG_CHUNK_OVERLAP=120
 RAG_TOP_K=4
+RAG_EMBEDDING_MODEL=embedding-3
+RAG_EMBEDDING_DIMENSIONS=128
+
+# ===== 文档上传 =====
+MAX_UPLOAD_BYTES=20971520
+ALLOWED_DOCUMENT_EXTENSIONS=[".txt",".md",".pdf",".docx"]
 ```
 
 ### 生产环境（backend/.env.production）
 
+详见 `backend/.env.production.example`，注意路径使用 Docker 容器内绝对路径：
+
 ```env
-OPENAI_API_KEY=                 # ⚠️ 必须填入有效 Key
-OPENAI_MODEL=glm-4-flash
+# ===== 必填 =====
+OPENAI_API_KEY=                           # ⚠️ 必须填入有效 Key
 OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-APP_CORS_ORIGINS=[“http://your-domain.com”,”https://your-domain.com”]
+
+# ===== 模型 =====
+OPENAI_MODEL=glm-4-flash
+
+# ===== JWT 安全 =====
+JWT_SECRET_KEY=change-me-to-a-random-string   # ⚠️ 务必修改为随机字符串
+
+# ===== CORS =====
+APP_CORS_ORIGINS=["http://your-domain.com","https://your-domain.com"]
+
+# ===== 持久化 =====
 PERSISTENCE_BACKEND=sqlite
 SQLITE_PATH=/app/data/chat.db
+
+# ===== RAG 知识库 =====
+ENABLE_RAG=true
+RAG_SOURCE_DIR=/app/knowledge
+DOCUMENT_STORE_DIR=/app/data/documents
+RAG_CHUNK_SIZE=800
+RAG_CHUNK_OVERLAP=120
+RAG_TOP_K=4
+RAG_EMBEDDING_MODEL=embedding-3
+RAG_EMBEDDING_DIMENSIONS=128
+
+# ===== 文档上传 =====
+MAX_UPLOAD_BYTES=20971520
+ALLOWED_DOCUMENT_EXTENSIONS=[".txt",".md",".pdf",".docx"]
 ```
 
 ---
@@ -226,9 +272,6 @@ python -m unittest discover -s tests -p “test_*.py”
 
 ## 后续扩展方向
 
-- [ ] 用户认证 + 多用户隔离
-- [ ] 深色/浅色主题切换
-- [ ] 移动端响应式适配
 - [ ] 对话导出（Markdown / 图片）
 - [ ] 会话 / 消息搜索
 - [ ] Token 用量统计

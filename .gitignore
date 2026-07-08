@@ -10,6 +10,11 @@ venv/
 node_modules/
 dist/
 
+# TypeScript build artifacts (JS files co-located with TS sources)
+frontend/src/**/*.js
+frontend/src/**/*.vue.js
+*.tsbuildinfo
+
 # Env files (keep .env.example and .env.production.example, ignore actual envs)
 .env
 backend/.env

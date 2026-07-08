@@ -64,7 +64,6 @@ def get_document_service() -> DocumentService:
 
 
 @lru_cache
-@lru_cache
 def get_user_repository() -> UserRepository:
     return SqliteUserRepository(settings.sqlite_path)
 
