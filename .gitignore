@@ -35,3 +35,6 @@ Thumbs.db
 
 # Docker
 .dockerignore
+
+# Runtime data (SQLite DB + uploaded documents)
+backend/data/
