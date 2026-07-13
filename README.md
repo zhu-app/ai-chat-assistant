@@ -1,7 +1,11 @@
 # AI Chat Assistant 🤖
 
+[![在线体验](https://img.shields.io/badge/在线体验-139.199.230.22-blue?style=for-the-badge)](http://139.199.230.22/)
+[![GitHub stars](https://img.shields.io/github/stars/zhu-app/ai-chat-assistant?style=for-the-badge)](https://github.com/zhu-app/ai-chat-assistant)
+
 > 一个生产就绪的全栈 AI 聊天应用，支持多用户、知识库 RAG、流式回复。  
-> 技术栈：**Vue 3 + FastAPI + LangChain + SQLite + Docker**
+> 技术栈：**Vue 3 + FastAPI + LangChain + SQLite + Docker**  
+> 🔗 **在线体验**: [http://139.199.230.22/](http://139.199.230.22/)
 
 ## 🏗️ 架构
 
