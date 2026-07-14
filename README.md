@@ -2,6 +2,7 @@
 
 [![在线体验](https://img.shields.io/badge/在线体验-139.199.230.22-blue?style=for-the-badge)](http://139.199.230.22/)
 [![GitHub stars](https://img.shields.io/github/stars/zhu-app/ai-chat-assistant?style=for-the-badge)](https://github.com/zhu-app/ai-chat-assistant)
+[![CI/CD](https://github.com/zhu-app/ai-chat-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/zhu-app/ai-chat-assistant/actions)
 
 > 一个生产就绪的全栈 AI 聊天应用，支持多用户、知识库 RAG、流式回复。  
 > 技术栈：**Vue 3 + FastAPI + LangChain + SQLite + Docker**  
@@ -88,6 +89,25 @@ npm run dev -- --host 127.0.0.1 --port 5173
 访问 `http://127.0.0.1:5173`
 
 ---
+## 🚀 自动部署（CI/CD）
+
+本项目配置了 **GitHub Actions CI/CD**，每次推送代码到 `main/master` 分支，会自动完成：
+
+```text
+git push → 自动跑测试 → 自动部署到服务器
+```
+
+整个过程全自动化，你只需要：
+
+```bash
+git add .
+git commit -m "更新内容"
+git push
+```
+
+然后去 [Actions 页面](https://github.com/zhu-app/ai-chat-assistant/actions) 查看部署进度，绿色 ✅ 即表示部署成功。
+
+---
 
 ## 🐳 Docker 部署（服务器）
 
@@ -115,21 +135,15 @@ docker compose up -d --build
 
 浏览器打开 `http://服务器IP` 即可使用。
 
-### 4️⃣ 管理
+### 4️⃣ 更新版本
 
 ```bash
-# 查看日志
-docker compose logs -f
+# 方式一：自动部署（推荐）
+# 本地修改代码后直接 git push，GitHub Actions 会自动部署
 
-# 更新版本
+# 方式二：手动更新服务器
 git pull
 docker compose up -d --build
-
-# 停止
-docker compose down
-
-# 数据备份（SQLite 数据库 + 上传文档）
-cp -r backend/data ./backup-$(date +%Y%m%d)
 ```
 
 ### 生产环境注意事项
