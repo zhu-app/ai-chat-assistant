@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 jobs:
-  backend:
+  test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,25 +32,20 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
 
-  frontend:
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npx vue-tsc --noEmit
-
-      - name: Build
-        run: npm run build
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/ai-chat-assistant
+            git pull
+            docker compose up -d --build
+            docker image prune -f
