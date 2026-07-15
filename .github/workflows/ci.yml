@@ -52,8 +52,10 @@ jobs:
       - name: 部署到服务器
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
+            set -e
             cd /root/ai-chat-assistant
-            git pull
+            git fetch origin
+            git reset --hard origin/master
             docker compose up -d --build
             docker image prune -f
           '
