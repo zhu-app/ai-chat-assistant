@@ -97,27 +97,7 @@ def get_chat_service() -> ChatService:
 
     # 始终创建 AgentPipeline（内部已延迟初始化，不阻塞）
     # 用户可在会话中随时开启/关闭 Agent 模式
-    # 根据搜索后端类型选择对应的 API Key
-    if settings.search_backend == 'qianfan':
-        search_api_key = settings.qianfan_api_key
-        search_secret_key = settings.qianfan_secret_key
-        search_plugin_id = settings.qianfan_plugin_id
-    elif settings.search_backend == 'bing':
-        search_api_key = settings.bing_api_key
-        search_secret_key = ''
-        search_plugin_id = ''
-    else:
-        search_api_key = ''
-        search_secret_key = ''
-        search_plugin_id = ''
-
-    agent_pipeline = AgentPipeline(
-        provider, retriever,
-        search_backend=settings.search_backend,
-        search_api_key=search_api_key,
-        search_secret_key=search_secret_key,
-        search_plugin_id=search_plugin_id,
-    )
+    agent_pipeline = AgentPipeline(provider, retriever)
 
     # 质量评估器（始终可用）
     response_evaluator = ResponseEvaluator(provider)

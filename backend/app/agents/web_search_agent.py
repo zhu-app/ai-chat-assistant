@@ -20,21 +20,9 @@ class WebSearchAgent(BaseAgent):
     label = '🌐 联网搜索'
     description = '搜索互联网获取最新信息'
 
-    def __init__(
-        self,
-        provider: ChatProvider,
-        backend_name: str = 'duckduckgo',
-        api_key: str = '',
-        secret_key: str = '',
-        plugin_id: str = '',
-    ) -> None:
+    def __init__(self, provider: ChatProvider) -> None:
         super().__init__(provider)
-        self.search_tool = WebSearchTool(
-            backend_name=backend_name,
-            api_key=api_key,
-            secret_key=secret_key,
-            plugin_id=plugin_id,
-        )
+        self.search_tool = WebSearchTool()
 
     def _build_user_message(self, ctx: AgentContext) -> str:
         # 搜索网络
