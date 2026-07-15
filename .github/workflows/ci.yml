@@ -56,11 +56,12 @@ jobs:
           echo '#!/bin/bash' > /tmp/deploy.sh
           echo 'set -e' >> /tmp/deploy.sh
           echo 'echo "=== 开始部署 ==="' >> /tmp/deploy.sh
-          echo 'TEMP_DIR=/root/ai-chat-assistant-temp' >> /tmp/deploy.sh
-          echo 'TARBALL=/root/ai-chat-assistant-tarball.tar.gz' >> /tmp/deploy.sh
-          echo 'OLD_DIR=/root/ai-chat-assistant-old' >> /tmp/deploy.sh
-          echo 'TARGET_DIR=/root/ai-chat-assistant' >> /tmp/deploy.sh
-          echo 'cd /root' >> /tmp/deploy.sh
+          echo 'BASE_DIR=$HOME' >> /tmp/deploy.sh
+          echo 'TEMP_DIR=$BASE_DIR/ai-chat-assistant-temp' >> /tmp/deploy.sh
+          echo 'TARBALL=$BASE_DIR/ai-chat-assistant-tarball.tar.gz' >> /tmp/deploy.sh
+          echo 'OLD_DIR=$BASE_DIR/ai-chat-assistant-old' >> /tmp/deploy.sh
+          echo 'TARGET_DIR=$BASE_DIR/ai-chat-assistant' >> /tmp/deploy.sh
+          echo 'cd $BASE_DIR' >> /tmp/deploy.sh
           echo 'rm -f "$TARBALL"' >> /tmp/deploy.sh
           echo 'DOWNLOAD_URL="https://github.com/zhu-app/ai-chat-assistant/archive/master.tar.gz"' >> /tmp/deploy.sh
           echo 'echo "Downloading tarball..."' >> /tmp/deploy.sh
