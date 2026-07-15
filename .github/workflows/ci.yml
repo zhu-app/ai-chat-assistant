@@ -49,19 +49,63 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: 生成 env 配置
+      - name: 部署到服务器
         run: |
-          echo "" > /tmp/env_config.txt
-          echo "# 搜索后端配置（search_backend: duckduckgo | bing | qianfan）" >> /tmp/env_config.txt
-          echo "search_backend=qianfan" >> /tmp/env_config.txt
-          echo "qianfan_api_key=${{ secrets.QIANFAN_API_KEY }}" >> /tmp/env_config.txt
-          echo "qianfan_secret_key=" >> /tmp/env_config.txt
-          echo "qianfan_plugin_id=${{ secrets.QIANFAN_PLUGIN_ID }}" >> /tmp/env_config.txt
+          # 构建搜索配置（用 printf 避免 heredoc 的 YAML 缩进问题）
+          ENV_CONFIG=$(printf '%s\n%s\n%s\n%s\n%s\n' \
+            'search_backend=qianfan' \
+            "qianfan_api_key=${{ secrets.QIANFAN_API_KEY }}" \
+            'qianfan_secret_key=' \
+            "qianfan_plugin_id=${{ secrets.QIANFAN_PLUGIN_ID }}" \
+            '')
+          ENV_B64=$(echo "$ENV_CONFIG" | base64 -w0)
 
-      - name: 上传配置和脚本到服务器并执行
-        run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-            /tmp/env_config.txt deploy.sh \
-            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/tmp/
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'bash /tmp/deploy.sh'
+            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} "
+            set -e
+            echo '=== 开始部署 ==='
+            TEMP_DIR=/root/ai-chat-assistant-temp
+            TARBALL=/root/ai-chat-assistant-tarball.tar.gz
+            OLD_DIR=/root/ai-chat-assistant-old
+            TARGET_DIR=/root/ai-chat-assistant
+
+            cd /root
+            rm -f \"\$TARBALL\"
+            echo 'Downloading tarball...'
+            curl -sL --connect-timeout 15 --max-time 90 -o \"\$TARBALL\" \
+              'https://github.com/zhu-app/ai-chat-assistant/archive/master.tar.gz' && echo 'curl OK' || echo 'curl failed'
+            if [ ! -f \"\$TARBALL\" ] || [ ! -s \"\$TARBALL\" ]; then
+              wget -q --timeout=90 -O \"\$TARBALL\" \
+                'https://github.com/zhu-app/ai-chat-assistant/archive/master.tar.gz' && echo 'wget OK' || echo 'wget failed'
+            fi
+            if [ ! -f \"\$TARBALL\" ] || [ ! -s \"\$TARBALL\" ]; then
+              echo 'ERROR: Failed to download tarball' >&2; exit 1
+            fi
+
+            rm -rf \"\$TEMP_DIR\"
+            mkdir -p \"\$TEMP_DIR\"
+            tar -xzf \"\$TARBALL\" -C \"\$TEMP_DIR\" --strip-components=1 || { echo 'ERROR: tar extraction failed' >&2; exit 1; }
+            rm -f \"\$TARBALL\"
+            echo 'Extracted OK'
+
+            cp \"\$TARGET_DIR/backend/data\" \"\$TEMP_DIR/backend/\" -r 2>/dev/null || true
+            cp \"\$TARGET_DIR/backend/.env.production\" \"\$TEMP_DIR/backend/\" 2>/dev/null || true
+            cp \"\$TARGET_DIR/backend/knowledge\" \"\$TEMP_DIR/backend/\" -r 2>/dev/null || true
+            echo 'Data preserved'
+
+            # 解码并写入搜索配置
+            echo \"\$ENV_B64\" | base64 -d >> \"\$TEMP_DIR/backend/.env.production\"
+            echo 'Env config merged'
+
+            rm -rf \"\$OLD_DIR\"
+            mv \"\$TARGET_DIR\" \"\$OLD_DIR\" 2>/dev/null || true
+            mv \"\$TEMP_DIR\" \"\$TARGET_DIR\"
+            echo 'Directory swapped'
+
+            cd \"\$TARGET_DIR\"
+            echo 'Building and restarting...'
+            docker compose up -d --build || echo 'docker compose failed'
+            docker image prune -f || true
+            rm -rf \"\$OLD_DIR\" 2>/dev/null || true
+            echo '=== 部署完成 ==='
+          "
