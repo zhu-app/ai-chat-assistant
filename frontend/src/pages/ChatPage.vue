@@ -69,7 +69,7 @@ const hasTelemetry = computed(() => telemetry.value !== null);
 const hasNewTelemetry = ref(false);
 
 // 主题切换
-const theme = ref<'dark' | 'light'>(readJson<'dark' | 'light'>('ai-chat-mvp:theme', 'dark'));
+const theme = ref<'dark' | 'light'>(readJson<'dark' | 'light'>('ai-chat-mvp:theme', 'light'));
 const toggleTheme = () => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark';
   writeJson('ai-chat-mvp:theme', theme.value);
