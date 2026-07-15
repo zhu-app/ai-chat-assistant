@@ -98,12 +98,13 @@ jobs:
 
             # 写入搜索配置（通过 GitHub Secrets 注入）
             if [ -n "$QIANFAN_KEY" ]; then
-              # 将千帆配置写入 .env.production
-              printf '\n# 搜索后端配置（search_backend: duckduckgo | bing | qianfan）\n' >> "$TEMP_DIR/backend/.env.production"
-              printf 'search_backend=qianfan\n' >> "$TEMP_DIR/backend/.env.production"
-              printf 'qianfan_api_key=%s\n' "$QIANFAN_KEY" >> "$TEMP_DIR/backend/.env.production"
-              printf 'qianfan_secret_key=\n' >> "$TEMP_DIR/backend/.env.production"
-              printf 'qianfan_plugin_id=%s\n' "$QIANFAN_PLUGIN_ID" >> "$TEMP_DIR/backend/.env.production"
+              # 用 echo 写入（避免 printf 单引号嵌套问题）
+              echo "" >> "$TEMP_DIR/backend/.env.production"
+              echo "# 搜索后端配置（search_backend: duckduckgo | bing | qianfan）" >> "$TEMP_DIR/backend/.env.production"
+              echo "search_backend=qianfan" >> "$TEMP_DIR/backend/.env.production"
+              echo "qianfan_api_key=$QIANFAN_KEY" >> "$TEMP_DIR/backend/.env.production"
+              echo "qianfan_secret_key=" >> "$TEMP_DIR/backend/.env.production"
+              echo "qianfan_plugin_id=$QIANFAN_PLUGIN_ID" >> "$TEMP_DIR/backend/.env.production"
               echo "Search config written"
             fi
 
