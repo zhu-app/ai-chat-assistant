@@ -1,12 +1,16 @@
 """
 联网搜索工具 — 让 AI 能搜索互联网获取实时信息。
 支持多个搜索后端，搜索失败时返回友好提示。
+注意：初始化时使用短超时快速失败，不阻塞主流程。
 """
 
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# 全局缓存：后端是否可用，避免每次请求都重试超时
+_backend_available: bool | None = None
 
 
 class SearchResult:
@@ -17,25 +21,33 @@ class SearchResult:
 
 
 class WebSearchTool:
-    """联网搜索工具 — 自动选择可用的搜索后端。"""
+    """联网搜索工具 — 延迟初始化，不阻塞主流程。"""
 
     def __init__(self) -> None:
-        self._backend = self._init_backend()
+        self._backend: Any | None = None  # 首次搜索时才初始化
 
-    @staticmethod
-    def _init_backend() -> Any:
-        # 优先 DuckDuckGo（免费，无需 API Key）
+    def _ensure_backend(self) -> bool:
+        """确保后端已初始化，快速失败（超时 2 秒）。"""
+        global _backend_available
+        if _backend_available is False:
+            return False
+        if self._backend is not None:
+            return True
         try:
             from duckduckgo_search import DDGS
-            test = list(DDGS().text('test', max_results=1))
+            ddgs = DDGS(timeout=2)
+            test = list(ddgs.text('test', max_results=1))
             if test:
-                return DDGS()
+                self._backend = ddgs
+                _backend_available = True
+                return True
         except Exception as exc:
             logger.warning('WebSearch: DuckDuckGo unavailable (%s)', exc)
-        return None
+        _backend_available = False
+        return False
 
     def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
-        if not self._backend:
+        if not self._ensure_backend():
             return []
         try:
             raw = list(self._backend.text(query, max_results=max_results))

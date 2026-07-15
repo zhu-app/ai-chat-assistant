@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     enable_prompt_optimizer: bool = True
 
     # Multi-Agent 协作
-    enable_agent_mode: bool = True
+    enable_agent_mode: bool = False
 
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / '.env'),
