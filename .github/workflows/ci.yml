@@ -49,23 +49,27 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: 部署到服务器（git clone 避免 fetch 卡死）
+      - name: 部署到服务器（curl 下载 tarball 替代 git clone，避免网络卡死）
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
             set -e
             TEMP_DIR=/root/ai-chat-assistant-temp
+            TARBALL=/root/ai-chat-assistant-tarball.tar.gz
             OLD_DIR=/root/ai-chat-assistant-old
             TARGET_DIR=/root/ai-chat-assistant
 
-            # 用 git clone（带超时和 SSH 超时配置，避免连接卡死）
+            # 用 curl 下载 tarball（HTTPS 端口 443，比 SSH 稳定）
+            rm -f "$TARBALL"
+            echo "Downloading tarball from GitHub..."
+            curl -sL --connect-timeout 15 --max-time 60 \
+              -o "$TARBALL" \
+              https://api.github.com/repos/zhu-app/ai-chat-assistant/tarball/master
+
+            # 解压（GitHub tarball 解压后第一层是 hash 目录）
             rm -rf "$TEMP_DIR"
-            export GIT_SSH_COMMAND="ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no"
-            timeout 60 git clone --depth 1 git@github.com:zhu-app/ai-chat-assistant.git "$TEMP_DIR" || {
-              echo "git clone via SSH failed, trying HTTPS..."
-              rm -rf "$TEMP_DIR"
-              timeout 60 git clone --depth 1 \
-                https://github.com/zhu-app/ai-chat-assistant.git "$TEMP_DIR"
-            }
+            mkdir -p "$TEMP_DIR"
+            tar -xzf "$TARBALL" -C "$TEMP_DIR" --strip-components=1
+            rm -f "$TARBALL"
 
             # 保留数据（数据库、文档、配置）
             cp "$TARGET_DIR/backend/data" "$TEMP_DIR/backend/" -r 2>/dev/null || true
