@@ -2,7 +2,6 @@
 
 [![在线体验](https://img.shields.io/badge/在线体验-139.199.230.22-blue?style=for-the-badge)](http://139.199.230.22/)
 [![GitHub stars](https://img.shields.io/github/stars/zhu-app/ai-chat-assistant?style=for-the-badge)](https://github.com/zhu-app/ai-chat-assistant)
-[![CI/CD](https://github.com/zhu-app/ai-chat-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/zhu-app/ai-chat-assistant/actions)
 
 > 一个生产就绪的全栈 AI 聊天应用，支持多用户、知识库 RAG、流式回复。  
 > 🚀 **核心亮点：Prompt 优化引擎 + Multi-Agent 协作系统**  
@@ -60,7 +59,6 @@
 | ⚙️ **设置持久化**（model / temperature / system prompt 跟随会话） | ✅ |
 | ⏱️ **LLM 超时保护** | ✅ |
 | 🐳 **Docker 容器化部署** | ✅ |
-| 🔄 **CI/CD**（GitHub Actions） | ✅ |
 | 🧪 **单元测试**（后端） | ✅ |
 | ✨ **Prompt 优化引擎** — 自动将模糊提问改写为结构化问题，提升回答质量 | ✅ **NEW** |
 | 🤖 **Multi-Agent 协作系统** — 编排器 + 多 Agent 并行协作 + 质量审查 | ✅ **NEW** |
@@ -120,25 +118,6 @@ npm run dev -- --host 127.0.0.1 --port 5173
 访问 `http://127.0.0.1:5173`
 
 ---
-## 🚀 自动部署（CI/CD）
-
-本项目配置了 **GitHub Actions CI/CD**，每次推送代码到 `main/master` 分支，会自动完成：
-
-```text
-git push → 自动跑测试 → 自动部署到服务器
-```
-
-整个过程全自动化，你只需要：
-
-```bash
-git add .
-git commit -m "更新内容"
-git push
-```
-
-然后去 [Actions 页面](https://github.com/zhu-app/ai-chat-assistant/actions) 查看部署进度，绿色 ✅ 即表示部署成功。
-
----
 
 ## 🐳 Docker 部署（服务器）
 
@@ -169,11 +148,9 @@ docker compose up -d --build
 ### 4️⃣ 更新版本
 
 ```bash
-# 方式一：自动部署（推荐）
-# 本地修改代码后直接 git push，GitHub Actions 会自动部署
-
-# 方式二：手动更新服务器
-git pull
+cd /root/ai-chat-assistant
+git fetch origin
+git reset --hard origin/master
 docker compose up -d --build
 ```
 
