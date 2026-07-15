@@ -95,10 +95,9 @@ def get_chat_service() -> ChatService:
     if settings.enable_prompt_optimizer:
         prompt_optimizer = PromptOptimizer(provider)
 
-    # 仅在启用时创建 AgentPipeline
-    agent_pipeline = None
-    if settings.enable_agent_mode:
-        agent_pipeline = AgentPipeline(provider, retriever)
+    # 始终创建 AgentPipeline（内部已延迟初始化，不阻塞）
+    # 用户可在会话中随时开启/关闭 Agent 模式
+    agent_pipeline = AgentPipeline(provider, retriever)
 
     # 质量评估器（始终可用）
     response_evaluator = ResponseEvaluator(provider)
