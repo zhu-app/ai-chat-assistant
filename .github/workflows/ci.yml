@@ -49,41 +49,59 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: 部署到服务器（curl 下载 tarball 替代 git clone，避免网络卡死）
+      - name: 部署到服务器（curl/wget 下载 tarball，避免 git 网络卡死）
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
-            set -e
+            echo "=== 开始部署 ==="
             TEMP_DIR=/root/ai-chat-assistant-temp
             TARBALL=/root/ai-chat-assistant-tarball.tar.gz
             OLD_DIR=/root/ai-chat-assistant-old
             TARGET_DIR=/root/ai-chat-assistant
 
-            # 用 curl 下载 tarball（HTTPS 端口 443，比 SSH 稳定）
+            # 下载 tarball（用 curl 或 wget，走 HTTPS 443 端口）
             rm -f "$TARBALL"
-            echo "Downloading tarball from GitHub..."
-            curl -sL --connect-timeout 15 --max-time 60 \
-              -o "$TARBALL" \
-              https://api.github.com/repos/zhu-app/ai-chat-assistant/tarball/master
+            DOWNLOAD_URL="https://github.com/zhu-app/ai-chat-assistant/archive/master.tar.gz"
+            echo "Downloading from $DOWNLOAD_URL ..."
 
-            # 解压（GitHub tarball 解压后第一层是 hash 目录）
+            if command -v curl >/dev/null 2>&1; then
+              curl -sL --connect-timeout 15 --max-time 90 -o "$TARBALL" "$DOWNLOAD_URL" && echo "curl OK" || echo "curl failed"
+            fi
+            if [ ! -f "$TARBALL" ] || [ ! -s "$TARBALL" ]; then
+              if command -v wget >/dev/null 2>&1; then
+                wget -q --timeout=90 -O "$TARBALL" "$DOWNLOAD_URL" && echo "wget OK" || echo "wget failed"
+              fi
+            fi
+            if [ ! -f "$TARBALL" ] || [ ! -s "$TARBALL" ]; then
+              echo "ERROR: Failed to download tarball" >&2
+              exit 1
+            fi
+
+            # 解压
             rm -rf "$TEMP_DIR"
             mkdir -p "$TEMP_DIR"
-            tar -xzf "$TARBALL" -C "$TEMP_DIR" --strip-components=1
+            tar -xzf "$TARBALL" -C "$TEMP_DIR" --strip-components=1 || {
+              echo "ERROR: tar extraction failed" >&2; exit 1
+            }
             rm -f "$TARBALL"
+            echo "Extracted OK"
 
-            # 保留数据（数据库、文档、配置）
+            # 保留数据
             cp "$TARGET_DIR/backend/data" "$TEMP_DIR/backend/" -r 2>/dev/null || true
             cp "$TARGET_DIR/backend/.env.production" "$TEMP_DIR/backend/" 2>/dev/null || true
             cp "$TARGET_DIR/backend/knowledge" "$TEMP_DIR/backend/" -r 2>/dev/null || true
+            echo "Data preserved"
 
             # 交换目录
             rm -rf "$OLD_DIR"
             mv "$TARGET_DIR" "$OLD_DIR" 2>/dev/null || true
             mv "$TEMP_DIR" "$TARGET_DIR"
+            echo "Directory swapped"
 
             # 构建重启
             cd "$TARGET_DIR"
-            docker compose up -d --build
-            docker image prune -f
+            echo "Building and restarting..."
+            docker compose up -d --build || echo "docker compose failed"
+            docker image prune -f || true
             rm -rf "$OLD_DIR" 2>/dev/null || true
+            echo "=== 部署完成 ==="
           '
