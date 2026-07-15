@@ -49,76 +49,83 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: 部署到服务器（curl/wget 下载 tarball，避免 git 网络卡死）
-        env:
-          QIANFAN_KEY: ${{ secrets.QIANFAN_API_KEY }}
-          QIANFAN_PLUGIN_ID: ${{ secrets.QIANFAN_PLUGIN_ID }}
+      - name: 生成配置文件和部署脚本
         run: |
+          # 生成 env 配置追加内容
+          cat > /tmp/env_config.txt << EOF
+
+# 搜索后端配置（search_backend: duckduckgo | bing | qianfan）
+search_backend=qianfan
+qianfan_api_key=${{ secrets.QIANFAN_API_KEY }}
+qianfan_secret_key=
+qianfan_plugin_id=${{ secrets.QIANFAN_PLUGIN_ID }}
+EOF
+
+          # 生成部署脚本（不含敏感信息，通过 SCP 传的配置文件合并）
+          cat > /tmp/deploy.sh << 'DEPLOY_SCRIPT'
+#!/bin/bash
+set -e
+echo "=== 开始部署 ==="
+TEMP_DIR=/root/ai-chat-assistant-temp
+TARBALL=/root/ai-chat-assistant-tarball.tar.gz
+OLD_DIR=/root/ai-chat-assistant-old
+TARGET_DIR=/root/ai-chat-assistant
+
+cd /root
+rm -f "$TARBALL"
+DOWNLOAD_URL="https://github.com/zhu-app/ai-chat-assistant/archive/master.tar.gz"
+echo "Downloading from $DOWNLOAD_URL ..."
+
+if command -v curl >/dev/null 2>&1; then
+  curl -sL --connect-timeout 15 --max-time 90 -o "$TARBALL" "$DOWNLOAD_URL" && echo "curl OK" || echo "curl failed"
+fi
+if [ ! -f "$TARBALL" ] || [ ! -s "$TARBALL" ]; then
+  if command -v wget >/dev/null 2>&1; then
+    wget -q --timeout=90 -O "$TARBALL" "$DOWNLOAD_URL" && echo "wget OK" || echo "wget failed"
+  fi
+fi
+if [ ! -f "$TARBALL" ] || [ ! -s "$TARBALL" ]; then
+  echo "ERROR: Failed to download tarball" >&2
+  exit 1
+fi
+
+rm -rf "$TEMP_DIR"
+mkdir -p "$TEMP_DIR"
+tar -xzf "$TARBALL" -C "$TEMP_DIR" --strip-components=1 || { echo "ERROR: tar extraction failed" >&2; exit 1; }
+rm -f "$TARBALL"
+echo "Extracted OK"
+
+cp "$TARGET_DIR/backend/data" "$TEMP_DIR/backend/" -r 2>/dev/null || true
+cp "$TARGET_DIR/backend/.env.production" "$TEMP_DIR/backend/" 2>/dev/null || true
+cp "$TARGET_DIR/backend/knowledge" "$TEMP_DIR/backend/" -r 2>/dev/null || true
+echo "Data preserved"
+
+# 合并 env 配置
+if [ -f /tmp/env_config.txt ]; then
+  cat /tmp/env_config.txt >> "$TEMP_DIR/backend/.env.production"
+  echo "Env config merged"
+fi
+
+rm -rf "$OLD_DIR"
+mv "$TARGET_DIR" "$OLD_DIR" 2>/dev/null || true
+mv "$TEMP_DIR" "$TARGET_DIR"
+echo "Directory swapped"
+
+cd "$TARGET_DIR"
+echo "Building and restarting..."
+docker compose up -d --build || echo "docker compose failed"
+docker image prune -f || true
+rm -rf "$OLD_DIR" 2>/dev/null || true
+echo "=== 部署完成 ==="
+DEPLOY_SCRIPT
+
+      - name: 上传配置和脚本到服务器并执行
+        run: |
+          # 先传配置文件
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            /tmp/env_config.txt /tmp/deploy.sh \
+            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/tmp/
+
+          # 再执行部署脚本
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-            -o SendEnv=QIANFAN_KEY -o SendEnv=QIANFAN_PLUGIN_ID \
-            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
-            echo "=== 开始部署 ==="
-            TEMP_DIR=/root/ai-chat-assistant-temp
-            TARBALL=/root/ai-chat-assistant-tarball.tar.gz
-            OLD_DIR=/root/ai-chat-assistant-old
-            TARGET_DIR=/root/ai-chat-assistant
-
-            # 下载 tarball（用 curl 或 wget，走 HTTPS 443 端口）
-            rm -f "$TARBALL"
-            DOWNLOAD_URL="https://github.com/zhu-app/ai-chat-assistant/archive/master.tar.gz"
-            echo "Downloading from $DOWNLOAD_URL ..."
-
-            if command -v curl >/dev/null 2>&1; then
-              curl -sL --connect-timeout 15 --max-time 90 -o "$TARBALL" "$DOWNLOAD_URL" && echo "curl OK" || echo "curl failed"
-            fi
-            if [ ! -f "$TARBALL" ] || [ ! -s "$TARBALL" ]; then
-              if command -v wget >/dev/null 2>&1; then
-                wget -q --timeout=90 -O "$TARBALL" "$DOWNLOAD_URL" && echo "wget OK" || echo "wget failed"
-              fi
-            fi
-            if [ ! -f "$TARBALL" ] || [ ! -s "$TARBALL" ]; then
-              echo "ERROR: Failed to download tarball" >&2
-              exit 1
-            fi
-
-            # 解压
-            rm -rf "$TEMP_DIR"
-            mkdir -p "$TEMP_DIR"
-            tar -xzf "$TARBALL" -C "$TEMP_DIR" --strip-components=1 || {
-              echo "ERROR: tar extraction failed" >&2; exit 1
-            }
-            rm -f "$TARBALL"
-            echo "Extracted OK"
-
-            # 保留数据
-            cp "$TARGET_DIR/backend/data" "$TEMP_DIR/backend/" -r 2>/dev/null || true
-            cp "$TARGET_DIR/backend/.env.production" "$TEMP_DIR/backend/" 2>/dev/null || true
-            cp "$TARGET_DIR/backend/knowledge" "$TEMP_DIR/backend/" -r 2>/dev/null || true
-            echo "Data preserved"
-
-            # 写入搜索配置（通过 GitHub Secrets 注入）
-            if [ -n "$QIANFAN_KEY" ]; then
-              # 用 echo 写入（避免 printf 单引号嵌套问题）
-              echo "" >> "$TEMP_DIR/backend/.env.production"
-              echo "# 搜索后端配置（search_backend: duckduckgo | bing | qianfan）" >> "$TEMP_DIR/backend/.env.production"
-              echo "search_backend=qianfan" >> "$TEMP_DIR/backend/.env.production"
-              echo "qianfan_api_key=$QIANFAN_KEY" >> "$TEMP_DIR/backend/.env.production"
-              echo "qianfan_secret_key=" >> "$TEMP_DIR/backend/.env.production"
-              echo "qianfan_plugin_id=$QIANFAN_PLUGIN_ID" >> "$TEMP_DIR/backend/.env.production"
-              echo "Search config written"
-            fi
-
-            # 交换目录
-            rm -rf "$OLD_DIR"
-            mv "$TARGET_DIR" "$OLD_DIR" 2>/dev/null || true
-            mv "$TEMP_DIR" "$TARGET_DIR"
-            echo "Directory swapped"
-
-            # 构建重启
-            cd "$TARGET_DIR"
-            echo "Building and restarting..."
-            docker compose up -d --build || echo "docker compose failed"
-            docker image prune -f || true
-            rm -rf "$OLD_DIR" 2>/dev/null || true
-            echo "=== 部署完成 ==="
-          '
+            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} 'bash /tmp/deploy.sh'
