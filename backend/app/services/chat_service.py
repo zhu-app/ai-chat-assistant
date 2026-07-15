@@ -270,9 +270,25 @@ class ChatService:
         if settings.enable_web_search:
             try:
                 from app.tools.web_search import WebSearchTool
+                # 根据后端类型选择对应 API Key
+                if app_settings.search_backend == 'qianfan':
+                    search_api_key = app_settings.qianfan_api_key
+                    search_secret_key = app_settings.qianfan_secret_key
+                    search_plugin_id = app_settings.qianfan_plugin_id
+                elif app_settings.search_backend == 'bing':
+                    search_api_key = app_settings.bing_api_key
+                    search_secret_key = ''
+                    search_plugin_id = ''
+                else:
+                    search_api_key = ''
+                    search_secret_key = ''
+                    search_plugin_id = ''
+
                 web_search = WebSearchTool(
                     backend_name=app_settings.search_backend,
-                    api_key=app_settings.bing_api_key,
+                    api_key=search_api_key,
+                    secret_key=search_secret_key,
+                    plugin_id=search_plugin_id,
                 )
                 web_results = web_search.search_formatted(user_message)
                 if web_results and not web_results.startswith('〈'):

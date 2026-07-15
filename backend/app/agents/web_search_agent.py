@@ -25,9 +25,16 @@ class WebSearchAgent(BaseAgent):
         provider: ChatProvider,
         backend_name: str = 'duckduckgo',
         api_key: str = '',
+        secret_key: str = '',
+        plugin_id: str = '',
     ) -> None:
         super().__init__(provider)
-        self.search_tool = WebSearchTool(backend_name=backend_name, api_key=api_key)
+        self.search_tool = WebSearchTool(
+            backend_name=backend_name,
+            api_key=api_key,
+            secret_key=secret_key,
+            plugin_id=plugin_id,
+        )
 
     def _build_user_message(self, ctx: AgentContext) -> str:
         # 搜索网络

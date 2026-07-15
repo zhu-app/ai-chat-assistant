@@ -40,9 +40,14 @@ class Settings(BaseSettings):
     rag_embedding_model: str = 'embedding-3'
     rag_embedding_dimensions: int = 128
 
-    # 搜索后端：duckduckgo | bing
+    # 搜索后端：duckduckgo | bing | qianfan
     search_backend: str = 'duckduckgo'
     bing_api_key: str = ''
+
+    # 百度千帆搜索配置（search_backend=qianfan 时使用）
+    qianfan_api_key: str = ''
+    qianfan_secret_key: str = ''
+    qianfan_plugin_id: str = ''
 
     # Prompt 优化引擎
     enable_prompt_optimizer: bool = True

@@ -45,18 +45,28 @@ class AgentPipeline:
         retriever: RetrievalRepository | None = None,
         search_backend: str = 'duckduckgo',
         search_api_key: str = '',
+        search_secret_key: str = '',
+        search_plugin_id: str = '',
     ) -> None:
         self.provider = provider
         self.retriever = retriever
         self.search_backend = search_backend
         self.search_api_key = search_api_key
+        self.search_secret_key = search_secret_key
+        self.search_plugin_id = search_plugin_id
         self.orchestrator = Orchestrator(provider)
         self.search_agent = SearchAgent(provider)
         self.analyst_agent = AnalystAgent(provider)
         self.code_agent = CodeAgent(provider)
         self.writer_agent = WriterAgent(provider)
         self.reviewer_agent = ReviewerAgent(provider)
-        self.web_search_agent = WebSearchAgent(provider, backend_name=search_backend, api_key=search_api_key)
+        self.web_search_agent = WebSearchAgent(
+            provider,
+            backend_name=search_backend,
+            api_key=search_api_key,
+            secret_key=search_secret_key,
+            plugin_id=search_plugin_id,
+        )
         self._agent_map = {
             'search': self.search_agent,
             'analyst': self.analyst_agent,
