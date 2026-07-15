@@ -50,8 +50,13 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
 
       - name: 部署到服务器（curl/wget 下载 tarball，避免 git 网络卡死）
+        env:
+          QIANFAN_KEY: ${{ secrets.QIANFAN_API_KEY }}
+          QIANFAN_PLUGIN_ID: ${{ secrets.QIANFAN_PLUGIN_ID }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            -o SendEnv=QIANFAN_KEY -o SendEnv=QIANFAN_PLUGIN_ID \
+            ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} '
             echo "=== 开始部署 ==="
             TEMP_DIR=/root/ai-chat-assistant-temp
             TARBALL=/root/ai-chat-assistant-tarball.tar.gz
@@ -90,6 +95,17 @@ jobs:
             cp "$TARGET_DIR/backend/.env.production" "$TEMP_DIR/backend/" 2>/dev/null || true
             cp "$TARGET_DIR/backend/knowledge" "$TEMP_DIR/backend/" -r 2>/dev/null || true
             echo "Data preserved"
+
+            # 写入搜索配置（通过 GitHub Secrets 注入）
+            if [ -n "$QIANFAN_KEY" ]; then
+              # 将千帆配置写入 .env.production
+              printf '\n# 搜索后端配置（search_backend: duckduckgo | bing | qianfan）\n' >> "$TEMP_DIR/backend/.env.production"
+              printf 'search_backend=qianfan\n' >> "$TEMP_DIR/backend/.env.production"
+              printf 'qianfan_api_key=%s\n' "$QIANFAN_KEY" >> "$TEMP_DIR/backend/.env.production"
+              printf 'qianfan_secret_key=\n' >> "$TEMP_DIR/backend/.env.production"
+              printf 'qianfan_plugin_id=%s\n' "$QIANFAN_PLUGIN_ID" >> "$TEMP_DIR/backend/.env.production"
+              echo "Search config written"
+            fi
 
             # 交换目录
             rm -rf "$OLD_DIR"
