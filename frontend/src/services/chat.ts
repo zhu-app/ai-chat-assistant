@@ -89,11 +89,10 @@ const parseSseChunk = (chunk: string): StreamEvent[] => {
 const fetchApi = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const headers = { ...authHeaders(), ...(options.headers as Record<string, string> || {}) };
   const response = await fetch(url, { ...options, headers });
-  // 401 时清除 token，后续操作会跳转到登录页
+  // 401 时清除 token，但不刷新页面（避免无限刷新循环）
   if (response.status === 401) {
     localStorage.removeItem('ai-chat-mvp:token');
     localStorage.removeItem('ai-chat-mvp:user');
-    window.location.reload();
   }
   return response;
 };
