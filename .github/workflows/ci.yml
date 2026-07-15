@@ -57,23 +57,29 @@ jobs:
             OLD_DIR=/root/ai-chat-assistant-old
             TARGET_DIR=/root/ai-chat-assistant
 
-            # 用 git clone --depth 1 替代 git fetch（解决 fetch 卡死问题）
+            # 用 git clone（带超时和 SSH 超时配置，避免连接卡死）
             rm -rf "$TEMP_DIR"
-            git clone --depth 1 git@github.com:zhu-app/ai-chat-assistant.git "$TEMP_DIR"
+            export GIT_SSH_COMMAND="ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no"
+            timeout 60 git clone --depth 1 git@github.com:zhu-app/ai-chat-assistant.git "$TEMP_DIR" || {
+              echo "git clone via SSH failed, trying HTTPS..."
+              rm -rf "$TEMP_DIR"
+              timeout 60 git clone --depth 1 \
+                https://github.com/zhu-app/ai-chat-assistant.git "$TEMP_DIR"
+            }
 
             # 保留数据（数据库、文档、配置）
-            cp "$TARGET_DIR/backend/data" "$TEMP_DIR/backend/" -r
+            cp "$TARGET_DIR/backend/data" "$TEMP_DIR/backend/" -r 2>/dev/null || true
             cp "$TARGET_DIR/backend/.env.production" "$TEMP_DIR/backend/" 2>/dev/null || true
             cp "$TARGET_DIR/backend/knowledge" "$TEMP_DIR/backend/" -r 2>/dev/null || true
 
             # 交换目录
             rm -rf "$OLD_DIR"
-            mv "$TARGET_DIR" "$OLD_DIR" || true
+            mv "$TARGET_DIR" "$OLD_DIR" 2>/dev/null || true
             mv "$TEMP_DIR" "$TARGET_DIR"
 
             # 构建重启
             cd "$TARGET_DIR"
             docker compose up -d --build
             docker image prune -f
-            rm -rf "$OLD_DIR"
+            rm -rf "$OLD_DIR" 2>/dev/null || true
           '
