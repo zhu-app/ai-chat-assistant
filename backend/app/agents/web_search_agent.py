@@ -20,9 +20,14 @@ class WebSearchAgent(BaseAgent):
     label = '🌐 联网搜索'
     description = '搜索互联网获取最新信息'
 
-    def __init__(self, provider: ChatProvider) -> None:
+    def __init__(
+        self,
+        provider: ChatProvider,
+        backend_name: str = 'duckduckgo',
+        api_key: str = '',
+    ) -> None:
         super().__init__(provider)
-        self.search_tool = WebSearchTool()
+        self.search_tool = WebSearchTool(backend_name=backend_name, api_key=api_key)
 
     def _build_user_message(self, ctx: AgentContext) -> str:
         # 搜索网络

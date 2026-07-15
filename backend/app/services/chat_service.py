@@ -270,7 +270,10 @@ class ChatService:
         if settings.enable_web_search:
             try:
                 from app.tools.web_search import WebSearchTool
-                web_search = WebSearchTool()
+                web_search = WebSearchTool(
+                    backend_name=app_settings.search_backend,
+                    api_key=app_settings.bing_api_key,
+                )
                 web_results = web_search.search_formatted(user_message)
                 if web_results and not web_results.startswith('〈'):
                     context_docs = [*context_docs, web_results]

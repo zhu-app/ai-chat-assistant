@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     rag_embedding_model: str = 'embedding-3'
     rag_embedding_dimensions: int = 128
 
+    # 搜索后端：duckduckgo | bing
+    search_backend: str = 'duckduckgo'
+    bing_api_key: str = ''
+
     # Prompt 优化引擎
     enable_prompt_optimizer: bool = True
 

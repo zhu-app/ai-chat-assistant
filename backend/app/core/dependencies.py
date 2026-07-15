@@ -97,7 +97,11 @@ def get_chat_service() -> ChatService:
 
     # 始终创建 AgentPipeline（内部已延迟初始化，不阻塞）
     # 用户可在会话中随时开启/关闭 Agent 模式
-    agent_pipeline = AgentPipeline(provider, retriever)
+    agent_pipeline = AgentPipeline(
+        provider, retriever,
+        search_backend=settings.search_backend,
+        search_api_key=settings.bing_api_key,
+    )
 
     # 质量评估器（始终可用）
     response_evaluator = ResponseEvaluator(provider)
