@@ -76,6 +76,20 @@ def login(payload: LoginRequest, repo: UserRepository = Depends(get_user_reposit
     return AuthResponse(token=token, user_id=user.id, username=user.username)
 
 
+@router.post('/guest', response_model=AuthResponse)
+def guest_login(repo: UserRepository = Depends(get_user_repository)):
+    """游客模式：自动创建临时用户，无需注册即可使用。"""
+    import uuid
+
+    guest_id = str(uuid.uuid4())[:8]
+    username = f'游客_{guest_id}'
+    password = str(uuid.uuid4())
+
+    user = repo.create(username, hash_password(password))
+    token = create_access_token({'sub': user.id, 'username': user.username})
+    return AuthResponse(token=token, user_id=user.id, username=user.username)
+
+
 @router.get('/me', response_model=UserInfoResponse)
 def get_me(
     user_id: str = Depends(get_current_user),

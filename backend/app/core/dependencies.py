@@ -83,9 +83,32 @@ def get_current_user(authorization: str = Header('')) -> str:
 
 
 def get_chat_service() -> ChatService:
+    from app.agents.agent_pipeline import AgentPipeline
+    from app.core.telemetry import ResponseEvaluator
+    from app.llm.prompt_optimizer import PromptOptimizer
+
+    provider = get_provider()
+    retriever = get_retriever()
+
+    # 仅在启用时创建 PromptOptimizer（节省内存）
+    prompt_optimizer = None
+    if settings.enable_prompt_optimizer:
+        prompt_optimizer = PromptOptimizer(provider)
+
+    # 仅在启用时创建 AgentPipeline
+    agent_pipeline = None
+    if settings.enable_agent_mode:
+        agent_pipeline = AgentPipeline(provider, retriever)
+
+    # 质量评估器（始终可用）
+    response_evaluator = ResponseEvaluator(provider)
+
     return ChatService(
         session_service=get_session_service(),
         session_repository=get_session_repository(),
-        provider=get_provider(),
-        retriever=get_retriever(),
+        provider=provider,
+        retriever=retriever,
+        prompt_optimizer=prompt_optimizer,
+        agent_pipeline=agent_pipeline,
+        response_evaluator=response_evaluator,
     )

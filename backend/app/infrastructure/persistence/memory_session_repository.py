@@ -15,6 +15,22 @@ class InMemorySessionRepository(SessionRepository):
             sessions = [s for s in sessions if s.user_id == user_id]
         return sorted(sessions, key=lambda item: item.updated_at, reverse=True)
 
+    def search_sessions(self, query: str, user_id: str | None = None) -> list[ChatSession]:
+        query_lower = query.lower()
+        matched = []
+        for session in self.sessions.values():
+            if user_id and session.user_id != user_id:
+                continue
+            if query_lower in session.title.lower():
+                matched.append(session)
+                continue
+            msgs = self.messages.get(session.id, [])
+            for msg in msgs:
+                if query_lower in (msg.content or '').lower():
+                    matched.append(session)
+                    break
+        return sorted(matched, key=lambda item: item.updated_at, reverse=True)
+
     def create_session(self, session: ChatSession) -> ChatSession:
         self.sessions[session.id] = session
         self.messages.setdefault(session.id, [])

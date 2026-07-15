@@ -10,3 +10,11 @@ class ChatProvider(Protocol):
         settings: SessionSettings,
         context_docs: list[str] | None = None,
     ) -> AsyncIterator[str]: ...
+
+    async def complete(
+        self,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.7,
+        model: str = '',
+    ) -> str: ...

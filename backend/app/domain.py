@@ -27,6 +27,22 @@ class SessionSettings:
     system_prompt: str = '你是一个清晰、直接、可靠的中文 AI 助手。'
     use_rag: bool = False
     document_ids: list[str] = field(default_factory=list)
+    # — Prompt 优化引擎 —
+    enable_prompt_optimizer: bool = False
+    # — Multi-Agent 协作模式 —
+    enable_agent_mode: bool = False
+    # — 联网搜索 —
+    enable_web_search: bool = False
+
+
+@dataclass
+class AgentStep:
+    """一个 Agent 执行步骤的记录"""
+    agent_name: str
+    agent_label: str
+    task: str
+    result: str = ''
+    status: str = 'pending'  # pending | running | done | error
 
 
 @dataclass
@@ -88,3 +104,22 @@ class RetrievedChunk:
     content: str
     score: int
     chunk_index: int = 0
+
+
+@dataclass
+class ResponseTelemetry:
+    """响应的遥测数据（性能、成本、质量）"""
+    # 性能
+    first_token_latency_ms: float = 0.0
+    total_duration_ms: float = 0.0
+    tokens_per_second: float = 0.0
+    # Token
+    input_tokens: int = 0
+    output_tokens: int = 0
+    estimated_cost_usd: float = 0.0
+    # RAG（如有）
+    rag_chunks_retrieved: int = 0
+    rag_top_score: float = 0.0
+    # 质量自评（如有）
+    quality_score: float = 0.0
+    quality_details: dict = field(default_factory=dict)

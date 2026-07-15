@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { useAuth } from '../composables/useAuth';
 
-const { login, register, authError, isLoading, isLoggedIn } = useAuth();
+const { login, register, guestLogin, authError, isLoading, isLoggedIn } = useAuth();
 
 const emit = defineEmits<{
   loggedIn: [];
@@ -31,6 +31,13 @@ const handleSubmit = async () => {
   } else {
     ok = await register(username.value, password.value);
   }
+  if (ok) {
+    emit('loggedIn');
+  }
+};
+
+const handleGuest = async () => {
+  const ok = await guestLogin();
   if (ok) {
     emit('loggedIn');
   }
@@ -86,6 +93,15 @@ const handleSubmit = async () => {
           {{ isLoading ? '请稍候…' : mode === 'login' ? '登录' : '注册' }}
         </button>
       </form>
+
+      <div class="login-card__divider">
+        <span>或</span>
+      </div>
+
+      <button class="guest-button" :disabled="isLoading" @click="handleGuest">
+        👤 游客模式，立即体验
+      </button>
+      <small class="guest-hint">无需注册，数据保存在本地</small>
 
       <p class="login-card__switch">
         {{ mode === 'login' ? '还没有账号？' : '已有账号？' }}
@@ -201,6 +217,55 @@ const handleSubmit = async () => {
 .login-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.login-card__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.login-card__divider::before,
+.login-card__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.guest-button {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.guest-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.guest-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.guest-hint {
+  display: block;
+  text-align: center;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .login-card__switch {

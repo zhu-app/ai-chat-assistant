@@ -4,6 +4,8 @@ import ComposerBox from '../components/chat/ComposerBox.vue';
 import MessageList from '../components/chat/MessageList.vue';
 import SessionSidebar from '../components/chat/SessionSidebar.vue';
 import SettingsPanel from '../components/chat/SettingsPanel.vue';
+import TelemetryPanel from '../components/chat/TelemetryPanel.vue';
+import LoginModal from '../components/LoginModal.vue';
 import { useAuth } from '../composables/useAuth';
 import { useComposer } from '../composables/useComposer';
 import { useMessages } from '../composables/useMessages';
@@ -12,11 +14,8 @@ import { useSettings } from '../composables/useSettings';
 import { useToast } from '../composables/useToast';
 import { readJson, writeJson } from '../utils/storage';
 
-const emit = defineEmits<{
-  logout: [];
-}>();
-
-const { user, logout } = useAuth();
+const { user, guestLogin, logout } = useAuth();
+const showLoginModal = ref(false);
 const toast = useToast();
 
 const {
@@ -30,7 +29,21 @@ const {
   removeSession,
   upsertSession,
 } = useSessions();
-const { messages, hasMessages, isStreaming, error, loadMessages, sendMessage, stopStream } = useMessages();
+const {
+  messages,
+  hasMessages,
+  isStreaming,
+  error,
+  loadMessages,
+  sendMessage,
+  stopStream,
+  agentPlan,
+  agentSteps,
+  agentReview,
+  promptOptimize,
+  telemetry,
+  clearAgentState,
+} = useMessages();
 const {
   settings,
   availableDocuments,
@@ -50,6 +63,11 @@ const sessionInfo = computed(() => currentSession.value);
 const sidebarCollapsed = ref(false);
 const settingsOpen = ref(false);
 
+// Telemetry 面板 — 不自动弹出，用小红点提示有新数据
+const showTelemetry = ref(false);
+const hasTelemetry = computed(() => telemetry.value !== null);
+const hasNewTelemetry = ref(false);
+
 // 主题切换
 const theme = ref<'dark' | 'light'>(readJson<'dark' | 'light'>('ai-chat-mvp:theme', 'dark'));
 const toggleTheme = () => {
@@ -68,6 +86,7 @@ watch(
   currentSessionId,
   (sessionId) => {
     loadMessages(sessionId);
+    clearAgentState();
     // 切换会话时，加载该会话保存的 model/systemPrompt/temperature
     if (sessionId) {
       const session = sessions.value.find((s) => s.id === sessionId);
@@ -85,13 +104,25 @@ watch(
 );
 
 onMounted(async () => {
+  // 未登录用户自动以游客模式进入
+  if (!user.value) {
+    await guestLogin();
+  }
   await loadSessions();
   await loadDocuments();
   // 新用户没有会话时，自动创建一个新对话
   if (sessions.value.length === 0) {
-    await handleCreateSession();
+    await createNewSession();
+    await loadSessions();
   }
   document.documentElement.setAttribute('data-theme', theme.value);
+});
+
+// Telemetry 新数据到达 → 标记小红点，不自动弹窗
+watch(telemetry, (val) => {
+  if (val) {
+    hasNewTelemetry.value = true;
+  }
 });
 
 const updateDraft = (value: string) => {
@@ -104,13 +135,28 @@ const toggleSidebar = () => {
 
 const handleCreateSession = async () => {
   if (isStreaming.value) stopStream();
-  await createNewSession();
+
+  // 如果当前会话还没有任何消息，不创建新会话，直接复用
+  if (currentSessionId.value && messages.value.length === 0) {
+    toast.info('当前对话为空，直接使用即可');
+    return;
+  }
+
+  try {
+    await createNewSession();
+    await loadSessions();
+    clearAgentState();
+  } catch (e) {
+    toast.error('创建对话失败');
+    return;
+  }
   toast.success('已创建新对话');
 };
 
 const handleSelectSession = (sessionId: string) => {
   if (isStreaming.value) stopStream();
   selectSession(sessionId);
+  clearAgentState();
 };
 
 const handleRenameSession = async (sessionId: string, title: string) => {
@@ -121,6 +167,7 @@ const handleRenameSession = async (sessionId: string, title: string) => {
 
 const runSend = async (content: string) => {
   const sessionId = currentSessionId.value;
+  clearAgentState();
   await sendMessage(
     {
       sessionId,
@@ -144,12 +191,14 @@ const runSend = async (content: string) => {
   if (sessionId) await loadMessages(sessionId);
 };
 
-const handleSend = async () => {
+const handleSend = () => {
   const content = draft.value.trim();
-  if (!content) return;
+  if (!content || isStreaming.value) return;
 
-  await runSend(content);
-  clearDraft();
+  // 立刻清空输入框，不等异步结束
+  draft.value = '';
+
+  runSend(content);
 };
 
 const handleRemoveSession = async (sessionId: string) => {
@@ -193,10 +242,33 @@ const handleRetry = async (messageId: string) => {
   await runSend(retryContent);
 };
 
-// 退出登录
-const handleLogout = () => {
+// 应用 Prompt 模板
+const handleApplyTemplate = (systemPrompt: string, suggestedMessage: string) => {
+  updateSettings({ ...settings.value, systemPrompt: systemPrompt });
+  if (suggestedMessage) {
+    draft.value = suggestedMessage;
+  }
+};
+
+// 登录 / 退出
+const handleLogin = () => {
+  showLoginModal.value = true;
+};
+
+const handleLoggedIn = () => {
+  showLoginModal.value = false;
+  toast.success('登录成功');
+};
+
+const handleLogout = async () => {
   logout();
-  emit('logout');
+  try {
+    await guestLogin();
+    await loadSessions();
+    toast.info('已切换到游客模式');
+  } catch {
+    // 游客模式失败不影响使用
+  }
 };
 
 // 导出对话为 Markdown
@@ -235,6 +307,7 @@ const handleExport = () => {
       @rename="handleRenameSession"
       @remove="handleRemoveSession"
       @close="sidebarCollapsed = true"
+      @login="handleLogin"
       @logout="handleLogout"
     />
 
@@ -263,6 +336,16 @@ const handleExport = () => {
           <button class="icon-button" title="导出对话" @click="handleExport" :disabled="!hasMessages">
             ⬇
           </button>
+          <button
+            class="icon-button telemetry-btn"
+            :class="{ 'icon-button--active': showTelemetry && hasTelemetry }"
+            title="响应分析"
+            :disabled="!hasTelemetry"
+            @click="showTelemetry = !showTelemetry; hasNewTelemetry = false"
+          >
+            📊
+            <span v-if="hasNewTelemetry" class="telemetry-btn__dot" />
+          </button>
           <button class="icon-button" title="切换主题" @click="toggleTheme">
             {{ theme === 'dark' ? '☀' : '🌙' }}
           </button>
@@ -276,10 +359,19 @@ const handleExport = () => {
       </header>
 
       <section class="chat-stage">
-        <MessageList v-if="hasMessages" :messages="messages" @retry="handleRetry" />
+        <MessageList
+          v-if="hasMessages || agentSteps.length > 0"
+          :messages="messages"
+          :agent-plan="agentPlan"
+          :agent-steps="agentSteps"
+          :agent-review="agentReview"
+          :prompt-optimize="promptOptimize"
+          @retry="handleRetry"
+        />
         <div v-else class="empty-stage">
           <h3>输入你的第一个问题</h3>
           <p>上传文档后，勾选右侧知识库文档并启用 RAG，就能基于文档进行问答。</p>
+          <p class="empty-stage__hint">还可开启 ✨ Prompt 优化 或 🤖 Agent 协作模式体验更强大的能力。</p>
         </div>
       </section>
 
@@ -287,9 +379,11 @@ const handleExport = () => {
       <ComposerBox
         :value="draft"
         :is-streaming="isStreaming"
+        :system-prompt="settings.systemPrompt"
         @update="updateDraft"
         @send="handleSend"
         @stop="stopStream"
+        @apply-template="handleApplyTemplate"
       />
     </main>
 
@@ -301,6 +395,18 @@ const handleExport = () => {
       @update="updateSettings"
       @upload="handleUploadDocuments"
       @remove-document="handleRemoveDocument"
+    />
+
+    <TelemetryPanel
+      :telemetry="telemetry"
+      :visible="showTelemetry && hasTelemetry"
+      @close="showTelemetry = false"
+    />
+
+    <LoginModal
+      v-if="showLoginModal"
+      @close="showLoginModal = false"
+      @logged-in="handleLoggedIn"
     />
   </div>
 </template>

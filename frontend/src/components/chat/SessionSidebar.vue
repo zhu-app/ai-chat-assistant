@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { ChatSession } from '../../types/chat';
 import type { AuthUser } from '../../composables/useAuth';
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
 
 const props = defineProps<{
   sessions: ChatSession[];
@@ -15,17 +17,63 @@ const emit = defineEmits<{
   remove: [sessionId: string];
   rename: [sessionId: string, title: string];
   close: [];
+  login: [];
   logout: [];
 }>();
 
 const searchQuery = ref('');
 const hasSessions = computed(() => props.sessions.length > 0);
+const isSearching = ref(false);
+const searchResults = ref<ChatSession[] | null>(null);
 
-const filteredSessions = computed(() => {
-  if (!searchQuery.value.trim()) return props.sessions;
-  const q = searchQuery.value.toLowerCase();
-  return props.sessions.filter((s) => s.title.toLowerCase().includes(q));
+const authHeaders = (): Record<string, string> => {
+  const token = (() => {
+    try {
+      const raw = localStorage.getItem('ai-chat-mvp:token');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// 搜索防抖
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+watch(searchQuery, (val) => {
+  if (searchTimer) clearTimeout(searchTimer);
+  if (!val.trim()) {
+    searchResults.value = null;
+    return;
+  }
+  isSearching.value = true;
+  searchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/sessions/search?q=${encodeURIComponent(val.trim())}`, {
+        headers: { ...authHeaders() },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // 转换为 ChatSession 格式
+        searchResults.value = data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          model: item.model || 'glm-4-flash',
+          systemPrompt: item.system_prompt || '',
+          temperature: item.temperature ?? 0.7,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }));
+      }
+    } catch { /* ignore */ }
+    isSearching.value = false;
+  }, 300);
 });
+
+const displaySessions = computed(() => {
+  if (searchResults.value !== null) return searchResults.value;
+  return props.sessions;
+});
+
+const apiSearchQuery = computed(() => searchQuery.value.trim());
 
 const editingId = ref<string | null>(null);
 const editTitle = ref('');
@@ -83,8 +131,9 @@ const formatTime = (iso: string) => {
     </div>
 
     <div v-if="hasSessions" class="session-list">
+      <div v-if="isSearching" class="session-list__searching">搜索中…</div>
       <div
-        v-for="session in filteredSessions"
+        v-for="session in displaySessions"
         :key="session.id"
         class="session-card"
         :class="{ 'session-card--active': session.id === currentSessionId }"
@@ -128,7 +177,20 @@ const formatTime = (iso: string) => {
     <div v-if="user" class="sidebar__user">
       <div class="sidebar__user-avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
       <span class="sidebar__user-name">{{ user.username }}</span>
-      <button class="sidebar__user-logout" @click="emit('logout')" title="退出登录">退出</button>
+      <div class="sidebar__user-actions">
+        <button
+          v-if="user.username.startsWith('游客')"
+          class="sidebar__user-login"
+          @click="emit('login')"
+          title="登录/注册"
+        >登录</button>
+        <button
+          v-else
+          class="sidebar__user-logout"
+          @click="emit('logout')"
+          title="退出登录"
+        >退出</button>
+      </div>
     </div>
   </aside>
 </template>

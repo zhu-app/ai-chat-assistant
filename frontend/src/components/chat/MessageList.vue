@@ -2,10 +2,8 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import type { ChatMessage } from '../../types/chat';
+import type { AgentPlanMeta, AgentStep, AgentReviewInfo, ChatMessage, PromptOptimizeInfo } from '../../types/chat';
 
-// 同步创建 marked 实例（marked 本身很小，~50KB）
-// highlight.js 按需加载，首次遇到代码块时才异步注入
 let markedInstance: Marked | null = null;
 let hljsLoading = false;
 let hljsLoaded = false;
@@ -24,7 +22,6 @@ function getMarked(): Marked {
               window.__hljs = mod.default;
             });
           }
-          // highlight.js 还没加载好，先返回原样
           return code;
         }
         const hljs = window.__hljs;
@@ -45,6 +42,10 @@ declare global {
 
 const props = defineProps<{
   messages: ChatMessage[];
+  agentPlan: AgentPlanMeta | null;
+  agentSteps: AgentStep[];
+  agentReview: AgentReviewInfo | null;
+  promptOptimize: PromptOptimizeInfo | null;
 }>();
 
 const emit = defineEmits<{
@@ -53,6 +54,8 @@ const emit = defineEmits<{
 
 const listRef = ref<HTMLDivElement | null>(null);
 const copiedMessageId = ref<string | null>(null);
+const showOptimizedPrompt = ref(false);
+const showAgentDetails = ref(true);
 
 const assistantEntries = computed(() => props.messages.filter((message) => message.role === 'assistant'));
 
@@ -68,7 +71,6 @@ const scrollToBottom = async () => {
   }
 };
 
-// 同步渲染 Markdown
 const renderMessageContent = (content: string): string => {
   if (!content) return '';
   try {
@@ -79,7 +81,6 @@ const renderMessageContent = (content: string): string => {
   }
 };
 
-// 消息更新后滚动到底部
 watch(
   () => props.messages.map((m) => `${m.id}:${m.content.length}:${m.status}`).join('|'),
   () => {
@@ -88,7 +89,6 @@ watch(
   { immediate: true },
 );
 
-// 简单的 HTML 转义
 const escapeHtml = (text: string) => {
   const div = document.createElement('div');
   div.textContent = text;
@@ -111,22 +111,88 @@ const canRetry = (messageIndex: number) => {
   return false;
 };
 
+// Agent 步骤状态图标
+const stepIcon = (status: string) => {
+  if (status === 'running') return '⏳';
+  if (status === 'done') return '✅';
+  if (status === 'error') return '❌';
+  return '⏸';
+};
+
 </script>
 
 <template>
   <div ref="listRef" class="message-list">
+    <!-- ═══ Prompt 优化提示 ═══ -->
+    <div v-if="promptOptimize && !promptOptimize.skipped" class="agent-banner agent-banner--prompt">
+      <div class="agent-banner__header" @click="showOptimizedPrompt = !showOptimizedPrompt">
+        <span>✨ 提问已优化</span>
+        <small>{{ showOptimizedPrompt ? '收起' : '展开' }}</small>
+      </div>
+      <div v-if="showOptimizedPrompt" class="agent-banner__body">
+        <div class="opt-compare">
+          <div class="opt-compare__item">
+            <small class="opt-compare__label">原始提问</small>
+            <p class="opt-compare__text">{{ promptOptimize.original }}</p>
+          </div>
+          <div class="opt-compare__arrow">→</div>
+          <div class="opt-compare__item">
+            <small class="opt-compare__label">优化后</small>
+            <p class="opt-compare__text opt-compare__text--optimized">{{ promptOptimize.optimized }}</p>
+          </div>
+        </div>
+        <div v-if="promptOptimize.strategies.length" class="opt-strategies">
+          <small>策略：{{ promptOptimize.strategies.join('、') }}</small>
+        </div>
+        <small class="opt-reason">{{ promptOptimize.reason }}</small>
+      </div>
+    </div>
+
+    <!-- ═══ Agent 工作流进度 ═══ -->
+    <div v-if="agentSteps.length" class="agent-workflow">
+      <div class="agent-workflow__header" @click="showAgentDetails = !showAgentDetails">
+        <span>🤖 Agent 协作中</span>
+        <small>{{ showAgentDetails ? '隐藏详情' : '查看详情' }}</small>
+      </div>
+      <div v-if="showAgentDetails" class="agent-workflow__body">
+        <div
+          v-for="(step, index) in agentSteps"
+          :key="step.agent"
+          class="agent-step"
+          :class="`agent-step--${step.status}`"
+        >
+          <div class="agent-step__indicator">{{ stepIcon(step.status) }}</div>
+          <div class="agent-step__content">
+            <div class="agent-step__title">
+              <strong>{{ step.label }}</strong>
+              <span class="agent-step__task">{{ step.task }}</span>
+            </div>
+            <div v-if="step.summary" class="agent-step__summary">{{ step.summary }}</div>
+          </div>
+          <div v-if="step.status === 'running'" class="agent-step__spinner" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Agent 审查结果 ═══ -->
+    <div v-if="agentReview" class="agent-banner agent-banner--review">
+      <div class="agent-banner__header">
+        <span>⭐ 质量审查</span>
+      </div>
+      <div class="agent-banner__body" v-html="renderMessageContent(agentReview.review)" />
+    </div>
+
+    <!-- ═══ 消息列表 ═══ -->
     <article
       v-for="(message, index) in messages"
       :key="message.id"
       class="message-item"
       :class="`message-item--${message.role}`"
     >
-      <!-- 头像 -->
       <div class="message-item__avatar">
         {{ message.role === 'user' ? '我' : 'AI' }}
       </div>
 
-      <!-- 消息体（标签 + 气泡 + 操作） -->
       <div class="message-item__body">
         <div class="message-item__label">{{ message.role === 'user' ? '你' : 'AI' }}</div>
 
@@ -136,7 +202,10 @@ const canRetry = (messageIndex: number) => {
             class="message-item__content"
             v-html="renderMessageContent(message.content)"
           />
-          <p v-else-if="message.status === 'streaming'">正在生成…</p>
+          <p v-else-if="message.status === 'streaming' && !agentSteps.length" class="message-item__generating">⏳ 思考中</p>
+          <p v-else-if="message.status === 'streaming' && agentSteps.length" class="message-item__generating message-item__generating--agent">
+            ⏳ Agent 协作中<span class="dot-pulse"><span>.</span><span>.</span><span>.</span></span>
+          </p>
           <p v-else-if="message.status === 'aborted'" class="message-item__aborted">已中断</p>
 
           <div v-if="message.sources?.length" class="message-item__sources">
@@ -170,7 +239,7 @@ const canRetry = (messageIndex: number) => {
     </article>
 
     <div v-if="assistantEntries.length >= 2" class="message-list__hint">
-      支持重试最近一轮回答，也可以在右侧切换当前检索文档范围。
+      支持重试最近一轮回答
     </div>
   </div>
 </template>

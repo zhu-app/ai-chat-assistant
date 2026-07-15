@@ -7,6 +7,9 @@ class SessionSettingsDto(BaseModel):
     systemPrompt: str = Field(default='你是一个清晰、直接、可靠的中文 AI 助手。')
     useRag: bool = Field(default=False)
     documentIds: list[str] = Field(default_factory=list)
+    enablePromptOptimizer: bool = Field(default=False)
+    enableAgentMode: bool = Field(default=False)
+    enableWebSearch: bool = Field(default=False)
 
 
 class RenameSessionRequest(BaseModel):

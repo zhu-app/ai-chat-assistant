@@ -81,3 +81,33 @@ class OpenAICompatibleChatProvider(ChatProvider):
                 text = ''.join(str(part) for part in text)
             if text:
                 yield str(text)
+
+    # ── 非流式补全：供 Prompt 优化器 & Agent 调用 ──
+    async def complete(
+        self,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.7,
+        model: str = '',
+    ) -> str:
+        """非流式 LLM 调用，返回完整文本。"""
+        if not self.has_remote_model or not self.client:
+            return self._mock_complete(system_prompt, user_message)
+
+        client = self.client.bind(
+            model=model or self.default_model,
+            temperature=temperature,
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_message),
+        ]
+        response = await client.ainvoke(messages)
+        text = getattr(response, 'content', '')
+        if isinstance(text, list):
+            text = ''.join(str(part) for part in text)
+        return str(text) if text else ''
+
+    @staticmethod
+    def _mock_complete(system_prompt: str, user_message: str) -> str:
+        return f'[本地模拟回复] 收到指令：{system_prompt[:30]}…\n你输入的内容：{user_message}'

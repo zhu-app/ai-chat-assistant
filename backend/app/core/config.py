@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     rag_embedding_model: str = 'embedding-3'
     rag_embedding_dimensions: int = 128
 
+    # Prompt 优化引擎
+    enable_prompt_optimizer: bool = True
+
+    # Multi-Agent 协作
+    enable_agent_mode: bool = True
+
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / '.env'),
         env_file_encoding='utf-8',

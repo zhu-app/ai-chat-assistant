@@ -23,6 +23,9 @@ export interface SessionSettings {
   systemPrompt: string;
   useRag: boolean;
   documentIds: string[];
+  enablePromptOptimizer: boolean;
+  enableAgentMode: boolean;
+  enableWebSearch: boolean;
 }
 
 export interface ChatSession {
@@ -45,16 +48,71 @@ export interface ChatMessage {
   sources?: KnowledgeSource[];
 }
 
+export interface AgentStepMeta {
+  agent: string;
+  label: string;
+  task: string;
+  summary?: string;
+}
+
+export interface AgentPlanMeta {
+  steps: Array<{ agent: string; task: string }>;
+  reason: string;
+}
+
 export interface StreamEvent {
-  type: 'session_created' | 'message_started' | 'token' | 'message_done' | 'error';
+  type: 'session_created' | 'message_started' | 'token' | 'message_done' | 'error'
+    | 'prompt_optimized' | 'agent_plan' | 'agent_step_start' | 'agent_step_done'
+    | 'agent_review' | 'agent_synthesized' | 'telemetry';
   sessionId?: string;
   messageId?: string;
   delta?: string;
   meta?: Record<string, unknown>;
 }
 
+export interface TelemetryData {
+  firstTokenLatencyMs?: number;
+  totalDurationMs?: number;
+  tokensPerSecond?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedCostUsd?: number;
+  ragChunksRetrieved?: number;
+  ragTopScore?: number;
+  qualityScore?: number;
+  qualityDetails?: {
+    accuracy: number;
+    completeness: number;
+    clarity: number;
+    usefulness: number;
+    summary: string;
+  };
+}
+
 export interface StreamRequest {
   sessionId?: string | null;
   message: string;
   settings: SessionSettings;
+}
+
+// ── Agent 工作流类型 ──
+
+export interface AgentStep {
+  agent: string;
+  label: string;
+  task: string;
+  status: 'pending' | 'running' | 'done' | 'error';
+  summary?: string;
+}
+
+export interface AgentReviewInfo {
+  review: string;
+}
+
+export interface PromptOptimizeInfo {
+  original: string;
+  optimized: string;
+  strategies: string[];
+  reason: string;
+  skipped?: boolean;
 }

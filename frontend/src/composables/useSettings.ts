@@ -9,6 +9,9 @@ const DEFAULT_SETTINGS: SessionSettings = {
   systemPrompt: '你是一个清晰、直接、可靠的中文 AI 助手。',
   useRag: false,
   documentIds: [],
+  enablePromptOptimizer: false,
+  enableAgentMode: false,
+  enableWebSearch: false,
 };
 
 const loadPersistedSettings = (): SessionSettings => {

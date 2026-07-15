@@ -8,6 +8,9 @@ class SessionRepository(ABC):
     def list_sessions(self, user_id: str | None = None) -> list[ChatSession]: ...
 
     @abstractmethod
+    def search_sessions(self, query: str, user_id: str | None = None) -> list[ChatSession]: ...
+
+    @abstractmethod
     def create_session(self, session: ChatSession) -> ChatSession: ...
 
     @abstractmethod

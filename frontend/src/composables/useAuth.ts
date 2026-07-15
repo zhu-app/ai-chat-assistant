@@ -75,6 +75,32 @@ export const useAuth = () => {
     }
   };
 
+  const guestLogin = async (): Promise<boolean> => {
+    authError.value = null;
+    isLoading.value = true;
+    try {
+      const res = await fetch(`${API_BASE}/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        authError.value = data.detail || '游客模式启动失败';
+        return false;
+      }
+      token.value = data.token;
+      user.value = { userId: data.user_id, username: data.username };
+      writeJson(storageKeys.token, data.token);
+      writeJson(storageKeys.user, { userId: data.user_id, username: data.username });
+      return true;
+    } catch {
+      authError.value = '网络错误，请检查连接';
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   const logout = () => {
     token.value = null;
     user.value = null;
@@ -91,6 +117,7 @@ export const useAuth = () => {
     apiHeaders,
     login,
     register,
+    guestLogin,
     logout,
   };
 };

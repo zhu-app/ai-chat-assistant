@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from app.api.schemas.chat import ChatStreamRequest, KnowledgeDocumentDto, RenameSessionRequest
 from app.core.dependencies import get_chat_service, get_current_user, get_document_service, get_session_service
 from app.domain import SessionSettings
+from app.prompt_templates import get_template, list_templates
 from app.llm.streaming import event_stream
 from app.services.chat_service import ChatService
 from app.services.document_service import DocumentService, DocumentValidationError
@@ -20,6 +21,18 @@ def list_sessions(
     user_id: str = Depends(get_current_user),
 ):
     return session_service.list_sessions(user_id=user_id)
+
+
+@router.get('/sessions/search')
+def search_sessions(
+    q: str = '',
+    session_service: SessionService = Depends(get_session_service),
+    user_id: str = Depends(get_current_user),
+):
+    """搜索会话（按标题和消息内容匹配）。"""
+    if not q.strip():
+        return session_service.list_sessions(user_id=user_id)
+    return session_service.search_sessions(q.strip(), user_id=user_id)
 
 
 @router.post('/sessions')
@@ -96,6 +109,28 @@ def delete_document(
     # 如果文档存在但不属于自己，delete_document 返回 None
 
 
+@router.get('/templates')
+def api_list_templates():
+    """列出所有 Prompt 模板。"""
+    return list_templates()
+
+
+@router.get('/templates/{template_id}')
+def api_get_template(template_id: str):
+    """获取单个模板详情（含 system_prompt）。"""
+    template = get_template(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail='模板不存在')
+    return {
+        'id': template.id,
+        'emoji': template.emoji,
+        'title': template.title,
+        'description': template.description,
+        'systemPrompt': template.system_prompt,
+        'suggestedMessage': template.suggested_message,
+    }
+
+
 @router.post('/chat/stream')
 async def chat_stream(
     payload: ChatStreamRequest,
@@ -109,6 +144,9 @@ async def chat_stream(
         system_prompt=payload.settings.systemPrompt,
         use_rag=payload.settings.useRag,
         document_ids=payload.settings.documentIds,
+        enable_prompt_optimizer=payload.settings.enablePromptOptimizer,
+        enable_agent_mode=payload.settings.enableAgentMode,
+        enable_web_search=payload.settings.enableWebSearch,
     )
     stream = chat_service.stream_chat(payload.sessionId, payload.message, settings, user_id=user_id)
 

@@ -134,6 +134,51 @@ const handleDrop = (e: DragEvent) => {
       />
     </label>
 
+    <!-- Prompt 优化引擎 -->
+    <label class="field field--row">
+      <span>
+        ✨ Prompt 优化
+      </span>
+      <input
+        type="checkbox"
+        :checked="settings.enablePromptOptimizer"
+        @change="updateField('enablePromptOptimizer', ($event.target as HTMLInputElement).checked)"
+      />
+    </label>
+    <small class="field-hint" v-if="settings.enablePromptOptimizer">
+      自动将模糊提问改写为结构化问题，提升回答质量
+    </small>
+
+    <!-- Multi-Agent 协作模式 -->
+    <label class="field field--row">
+      <span>
+        🤖 Agent 协作模式
+      </span>
+      <input
+        type="checkbox"
+        :checked="settings.enableAgentMode"
+        @change="updateField('enableAgentMode', ($event.target as HTMLInputElement).checked)"
+      />
+    </label>
+    <small class="field-hint" v-if="settings.enableAgentMode">
+      多个 AI Agent 协作：分析 → 搜索 → 撰写 → 审查
+    </small>
+
+    <!-- 联网搜索 -->
+    <label class="field field--row">
+      <span>
+        🌐 联网搜索
+      </span>
+      <input
+        type="checkbox"
+        :checked="settings.enableWebSearch"
+        @change="updateField('enableWebSearch', ($event.target as HTMLInputElement).checked)"
+      />
+    </label>
+    <small class="field-hint" v-if="settings.enableWebSearch">
+      AI 自动搜索互联网获取实时信息，普通模式和 Agent 模式均可用
+    </small>
+
     <!-- 文档上传（支持拖拽） -->
     <div class="field">
       <span>知识库文档</span>

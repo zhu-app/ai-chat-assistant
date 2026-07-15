@@ -31,7 +31,9 @@ class ChatServiceTestCase(unittest.TestCase):
         self.assertEqual(event_types[0], 'session_created')
         self.assertEqual(event_types[1], 'message_started')
         self.assertIn('token', event_types)
-        self.assertEqual(event_types[-1], 'message_done')
+        # 最后两个事件：message_done 然后是 telemetry
+        self.assertIn('message_done', event_types[-2:])
+        self.assertIn('telemetry', event_types[-2:])
 
 
 if __name__ == '__main__':

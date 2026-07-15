@@ -84,6 +84,28 @@ class SqliteSessionRepository(SessionRepository):
                 rows = connection.execute('SELECT * FROM sessions ORDER BY updated_at DESC').fetchall()
         return [self._to_session(row) for row in rows]
 
+    def search_sessions(self, query: str, user_id: str | None = None) -> list[ChatSession]:
+        """按标题或消息内容搜索会话。"""
+        like = f'%{query}%'
+        with self._connect() as connection:
+            if user_id:
+                rows = connection.execute(
+                    '''SELECT DISTINCT s.* FROM sessions s
+                       LEFT JOIN messages m ON m.session_id = s.id
+                       WHERE (s.title LIKE ? OR m.content LIKE ?) AND s.user_id = ?
+                       ORDER BY s.updated_at DESC''',
+                    (like, like, user_id),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    '''SELECT DISTINCT s.* FROM sessions s
+                       LEFT JOIN messages m ON m.session_id = s.id
+                       WHERE s.title LIKE ? OR m.content LIKE ?
+                       ORDER BY s.updated_at DESC''',
+                    (like, like),
+                ).fetchall()
+        return [self._to_session(row) for row in rows]
+
     def create_session(self, session: ChatSession) -> ChatSession:
         with self._connect() as connection:
             connection.execute(

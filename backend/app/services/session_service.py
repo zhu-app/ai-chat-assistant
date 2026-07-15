@@ -9,6 +9,11 @@ class SessionService:
     def list_sessions(self, user_id: str | None = None) -> list[ChatSession]:
         return self.repository.list_sessions(user_id=user_id)
 
+    def search_sessions(self, query: str, user_id: str | None = None) -> list[ChatSession]:
+        if not query.strip():
+            return self.repository.list_sessions(user_id=user_id)
+        return self.repository.search_sessions(query.strip(), user_id=user_id)
+
     def create_session(self, settings: SessionSettings | None = None, user_id: str = '') -> ChatSession:
         session = ChatSession(
             user_id=user_id,
