@@ -173,24 +173,70 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  padding: 0 4px;
+  margin-bottom: 24px;
+  padding: 20px 16px 0;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.sidebar__brand-icon {
+  font-size: 22px;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sidebar__brand-text {
+  font-size: 17px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .sidebar__header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+}
+
+.sidebar__icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.sidebar__icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .sidebar__close-btn {
   font-size: 16px;
-  padding: 4px 10px;
 }
 
 /* 搜索框 */
 .sidebar__search {
-  padding: 0 8px 8px;
+  padding: 0 16px 12px;
   flex-shrink: 0;
 }
 
@@ -302,21 +348,6 @@ button {
   }
 }
 
-.sidebar__eyebrow {
-  margin: 0 0 2px;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.sidebar h1 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
 .session-list {
   display: flex;
   flex-direction: column;
@@ -324,8 +355,8 @@ button {
   min-height: 0;
   overflow-y: auto;
   flex: 1;
-  margin: 0 -8px;
-  padding: 0 8px;
+  margin: 0 -16px;
+  padding: 0 16px;
 }
 
 .session-card {

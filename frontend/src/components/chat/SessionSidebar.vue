@@ -110,13 +110,13 @@ const formatTime = (iso: string) => {
 <template>
   <aside class="sidebar">
     <div class="sidebar__header">
-      <div>
-        <p class="sidebar__eyebrow">AI Chat</p>
-        <h1>对话</h1>
+      <div class="sidebar__brand">
+        <span class="sidebar__brand-icon">✦</span>
+        <span class="sidebar__brand-text">AI Chat</span>
       </div>
       <div class="sidebar__header-actions">
-        <button class="ghost-button sidebar__close-btn" @click="emit('close')" title="关闭侧栏">✕</button>
         <button class="ghost-button" @click="emit('create')">新建</button>
+        <button class="sidebar__icon-btn sidebar__close-btn" @click="emit('close')" title="关闭侧栏">✕</button>
       </div>
     </div>
 
