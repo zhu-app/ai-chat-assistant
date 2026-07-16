@@ -14,6 +14,8 @@ import { useSettings } from '../composables/useSettings';
 import { useToast } from '../composables/useToast';
 import { readJson, writeJson } from '../utils/storage';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+
 const { user, guestLogin, logout } = useAuth();
 const showLoginModal = ref(false);
 const toast = useToast();
@@ -62,6 +64,9 @@ const sessionInfo = computed(() => currentSession.value);
 // 侧栏折叠状态（默认展开，点击 ✕ 折叠）
 const sidebarCollapsed = ref(false);
 const settingsOpen = ref(false);
+
+// 检测后端是否为模拟模式（未配置 API Key）
+const mockMode = ref(false);
 
 // Telemetry 面板 — 不自动弹出，用小红点提示有新数据
 const showTelemetry = ref(false);
@@ -116,6 +121,17 @@ onMounted(async () => {
     await loadSessions();
   }
   document.documentElement.setAttribute('data-theme', theme.value);
+
+  // 检测后端是否为模拟模式
+  try {
+    const res = await fetch(`${API_BASE}/health/ready`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.checks?.llm?.remote_enabled === false) {
+        mockMode.value = true;
+      }
+    }
+  } catch { /* ignore */ }
 });
 
 // Telemetry 新数据到达 → 标记小红点，不自动弹窗
@@ -229,13 +245,19 @@ const handleRetry = async (messageId: string) => {
   const retryContent = messages.value[userIndex]?.content;
   if (!retryContent) return;
 
-  // 移除旧的失败消息对（user + assistant）
-  const removeIds = [messages.value[userIndex]?.id, messageId].filter(Boolean);
-  const oldMessages = messages.value;
-  messages.value = messages.value.filter((m) => !removeIds.includes(m.id));
-  // 如果删除后数组没变，说明消息不在列表中，恢复原样
-  if (messages.value.length === oldMessages.length) {
-    messages.value = oldMessages;
+  // 重试时不清除旧消息，而是让新生成的消息自然覆盖（服务器端不保留删除逻辑）
+  // 旧消息保留在列表中，新消息会追加在后面，用户可手动删除旧会话
+  // 更好的方案：在服务端添加删除消息 API，但简单场景下直接清空当前会话最后一条 assistant 消息即可
+  const lastAssistantIndex = (() => {
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      if (messages.value[i]?.role === 'assistant') return i;
+    }
+    return -1;
+  })();
+
+  if (lastAssistantIndex >= 0 && lastAssistantIndex === messageIndex) {
+    // 只移除最后一条 assistant 消息（当前正在重试的），保留 user 消息
+    messages.value = messages.value.filter((_, i) => i !== messageIndex);
   }
 
   draft.value = retryContent;
@@ -366,6 +388,8 @@ const handleExport = () => {
           :agent-steps="agentSteps"
           :agent-review="agentReview"
           :prompt-optimize="promptOptimize"
+          :is-streaming="isStreaming"
+          :enable-prompt-optimizer="settings.enablePromptOptimizer"
           @retry="handleRetry"
         />
         <div v-else class="empty-stage">
@@ -376,6 +400,10 @@ const handleExport = () => {
       </section>
 
       <p v-if="error" class="error-banner">{{ error }}</p>
+	<p v-if="mockMode" class="warning-banner">
+		⚠️ 后端未配置 API Key，当前为本地模拟模式，所有回复均为测试数据。
+		<a :href="`${API_BASE}/health/ready`" target="_blank" style="color:inherit;text-decoration:underline;">查看状态</a>
+	</p>
       <ComposerBox
         :value="draft"
         :is-streaming="isStreaming"

@@ -183,7 +183,8 @@ class AgentPipeline:
         if plan.has_agent('reviewer'):
             review_ctx = AgentContext(
                 question=question,
-                history_context=full_response,
+                history_context=history_text,
+                final_answer=full_response,
                 temperature=0.2,
                 model=settings.model,
             )

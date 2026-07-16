@@ -54,13 +54,39 @@ def _extract_history_context(history: list[ChatMessage], max_messages: int = 6) 
 
 
 def _needs_optimization(user_message: str) -> bool:
-    """快速判断是否值得做 LLM 优化（节省 API 调用）。"""
+    """智能判断是否值得做 LLM 优化（节省 API 调用）。
+
+    优化判断原则：
+    - 超短提问（<8字）→ 大概率模糊，需要优化
+    - 纯祈使句（如"讲一下Python"、"介绍AI"）→ 虽然简短但明确，跳过优化
+    - 复杂问题（有明确的结构化需求）→ 跳过优化（用户已想清楚）
+    - 中间状态（8-20字，无结构）→ 需要优化
+    """
+    text = user_message.strip()
+
     # 超短大概率模糊
-    if len(user_message.strip()) < _SHORT_THRESHOLD:
+    if len(text) < _SHORT_THRESHOLD:
         return True
+
+    # 如果已经包含明确的结构化标记（数字列表、对比词、问题词），跳过优化
+    structured_patterns = [
+        r'[1-9]\)', r'[1-9]\.',        # 数字列表
+        r'对比|区别|优缺点|异同|vs|VS',  # 对比类
+        r'步骤|流程|方法|方案|如何',     # 结构化请求
+        r'为什么|怎么|怎样|哪些|多少',   # 具体问题词
+    ]
+    import re
+    if any(re.search(p, text) for p in structured_patterns):
+        return False
+
     # 没有标点、没有问号、没有换行 → 可能是随手打的
-    if not any(ch in user_message for ch in '？?。.\n，,'):
+    if not any(ch in text for ch in '？?。.\n，,'):
         return True
+
+    # 有标点但整体像随手输入（短且无问句特征）
+    if len(text) < 20 and '?' not in text and '？' not in text:
+        return True
+
     return False
 
 

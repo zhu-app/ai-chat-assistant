@@ -34,7 +34,7 @@ class ReviewerAgent(BaseAgent):
 
     def _build_user_message(self, ctx: AgentContext) -> str:
         # Reviewer 需要看到最终的回答
-        final_answer = ctx.history_context or ''
+        final_answer = ctx.final_answer or ctx.history_context or ''
         if not final_answer:
             return f'## 用户提问\n{ctx.question}\n\n（最终回答为空，无法审查）'
         return (

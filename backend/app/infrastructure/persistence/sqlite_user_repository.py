@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.domain import User
@@ -14,6 +15,8 @@ class SqliteUserRepository(UserRepository):
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        connection.execute('PRAGMA journal_mode=WAL')
+        connection.execute('PRAGMA synchronous=NORMAL')
         return connection
 
     def _init_schema(self) -> None:
@@ -65,3 +68,31 @@ class SqliteUserRepository(UserRepository):
                 (user.id, user.username, user.hashed_password, user.created_at),
             )
         return user
+
+    def cleanup_guest_users(self, days: int = 7) -> int:
+        """删除指定天数前的游客用户及其关联数据。"""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._connect() as connection:
+            # 找出过期游客用户
+            expired = connection.execute(
+                "SELECT id FROM users WHERE username LIKE '游客_%' AND created_at < ?",
+                (cutoff,),
+            ).fetchall()
+            expired_ids = [row['id'] for row in expired]
+            if not expired_ids:
+                return 0
+            # 级联删除会话和消息
+            placeholders = ','.join('?' * len(expired_ids))
+            connection.execute(
+                f"DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE user_id IN ({placeholders}))",
+                expired_ids,
+            )
+            connection.execute(
+                f"DELETE FROM sessions WHERE user_id IN ({placeholders})",
+                expired_ids,
+            )
+            connection.execute(
+                f"DELETE FROM users WHERE id IN ({placeholders})",
+                expired_ids,
+            )
+        return len(expired_ids)

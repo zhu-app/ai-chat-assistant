@@ -365,6 +365,7 @@ class ChatService:
             'estimatedCostUsd': cost,
             'ragChunksRetrieved': len(retrieved_chunks),
             'ragTopScore': round(max((c.score for c in retrieved_chunks), default=0.0), 2),
+            'embeddingMode': self.retriever.embedding_mode,
             'qualityScore': quality_score,
             'qualityDetails': quality_details,
         }

@@ -42,7 +42,7 @@ TEMPLATES: list[PromptTemplate] = [
         system_prompt='你是一个内容总结专家。提取核心观点、按逻辑组织、保留重要数据。',
         suggested_message='请帮我总结以下内容：'),
     PromptTemplate(
-        id='brainstorm', emoji='💡', title='头脑风报',
+        id='brainstorm', emoji='💡', title='头脑风暴',
         description='发散思维，生成创意点子',
         system_prompt='你是创意策划专家。围绕主题提出至少5个创意方向，每个给出2-3个具体点子。',
         suggested_message='我需要关于「」的创意，帮我 brainstorm 一下。'),

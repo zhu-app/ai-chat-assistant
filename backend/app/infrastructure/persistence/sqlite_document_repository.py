@@ -15,6 +15,8 @@ class SqliteDocumentRepository(DocumentRepository):
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        connection.execute('PRAGMA journal_mode=WAL')
+        connection.execute('PRAGMA synchronous=NORMAL')
         return connection
 
     def _init_schema(self) -> None:
@@ -49,6 +51,9 @@ class SqliteDocumentRepository(DocumentRepository):
                     FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
                     FOREIGN KEY(chunk_id) REFERENCES document_chunks(id) ON DELETE CASCADE
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_chunk_vectors_doc_id ON document_chunk_vectors(document_id);
+                CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON document_chunks(document_id);
                 '''
             )
             # 兼容旧表

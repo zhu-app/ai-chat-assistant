@@ -78,7 +78,9 @@ def login(payload: LoginRequest, repo: UserRepository = Depends(get_user_reposit
 
 @router.post('/guest', response_model=AuthResponse)
 def guest_login(repo: UserRepository = Depends(get_user_repository)):
-    """游客模式：自动创建临时用户，无需注册即可使用。"""
+    """游客模式：自动创建临时用户，无需注册即可使用。
+    注意：游客账号不会持久化在 localStorage 中，刷新页面会创建新游客。
+    """
     import uuid
 
     guest_id = str(uuid.uuid4())[:8]

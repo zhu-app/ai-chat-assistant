@@ -162,41 +162,7 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.sidebar > .sidebar__header {
-  padding: 16px 16px 8px;
-  flex-shrink: 0;
-}
-
-.sidebar > .session-list,
-.sidebar > .empty-panel {
-  flex: 1;
-  min-height: 0;
-  padding: 0 8px;
-}
-
-.sidebar > .empty-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  text-align: center;
-}
-
-.settings-panel {
-  padding: 16px;
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.settings-panel {
-  border-right: none;
-  border-left: 1px solid var(--border);
+  gap: 14px;
 }
 
 /* ==============================
@@ -952,6 +918,75 @@ button {
   margin-top: 8px;
 }
 
+/* ==============================
+   Prompt 优化内联（在用户消息下方）
+   ============================== */
+
+.opt-inline {
+  margin-top: 6px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  animation: messageIn 0.25s ease-out;
+}
+
+.opt-inline--pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-color: rgba(79, 124, 255, 0.2);
+  background: rgba(79, 124, 255, 0.06);
+}
+
+.opt-inline__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: background 0.12s ease;
+}
+
+.opt-inline__header:hover {
+  background: var(--bg-hover);
+}
+
+.opt-inline__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.opt-inline__toggle {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.opt-inline__body {
+  padding: 0 12px 10px;
+}
+
+.opt-inline__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: optSpin 0.7s linear infinite;
+  margin-left: auto;
+}
+
+@keyframes optSpin {
+  to { transform: rotate(360deg); }
+}
+
 /* 单条消息 */
 .message-item {
   display: flex;
@@ -1322,6 +1357,16 @@ button {
   border: 1px solid rgba(242, 90, 90, 0.2);
 }
 
+.warning-banner {
+  margin: 0 24px 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #ffd54f;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
 /* ==============================
    输入框 Composer
    ============================== */
@@ -1406,10 +1451,6 @@ button {
 /* ==============================
    设置面板 Settings
    ============================== */
-
-.settings-panel {
-  gap: 14px;
-}
 
 .panel-title {
   margin: 0 0 4px;

@@ -15,3 +15,6 @@ class UserRepository(ABC):
 
     @abstractmethod
     def create(self, username: str, hashed_password: str) -> User: ...
+
+    @abstractmethod
+    def cleanup_guest_users(self, days: int = 7) -> int: ...

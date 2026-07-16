@@ -14,6 +14,8 @@ class SqliteSessionRepository(SessionRepository):
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        connection.execute('PRAGMA journal_mode=WAL')
+        connection.execute('PRAGMA synchronous=NORMAL')
         return connection
 
     def _init_schema(self) -> None:
@@ -127,7 +129,7 @@ class SqliteSessionRepository(SessionRepository):
     def save_message(self, message: ChatMessage) -> ChatMessage:
         with self._connect() as connection:
             connection.execute(
-                'INSERT INTO messages (id, session_id, role, content, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                'INSERT OR REPLACE INTO messages (id, session_id, role, content, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
                 (message.id, message.session_id, message.role, message.content, message.status, message.created_at),
             )
         self.touch_session(message.session_id)

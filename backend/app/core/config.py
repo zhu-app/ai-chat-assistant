@@ -53,3 +53,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# 启动时校验关键配置
+if settings.openai_api_key:
+    _masked_key = settings.openai_api_key[:8] + '...' + settings.openai_api_key[-4:] if len(settings.openai_api_key) > 12 else '***'
+    print(f'[配置] OpenAI API Key: {_masked_key}')
+    print(f'[配置] 模型: {settings.openai_model}')
+else:
+    print('[警告] ⚠️  未配置 OPENAI_API_KEY！所有 AI 回复将使用本地模拟回复，不会调用真实 LLM。')
+    print('[警告]    请创建 backend/.env 文件并填入 OPENAI_API_KEY')
+
+if settings.jwt_secret_key == 'change-me-in-production-use-a-random-string':
+    print('[警告] ⚠️  JWT_SECRET_KEY 使用默认值！生产环境务必修改为随机字符串。')

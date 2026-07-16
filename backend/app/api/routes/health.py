@@ -1,8 +1,12 @@
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter
 
 from app.core.config import settings
+from app.core.dependencies import get_embedding_engine
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=['health'])
 

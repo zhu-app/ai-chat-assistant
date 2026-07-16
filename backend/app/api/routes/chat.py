@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.schemas.chat import ChatStreamRequest, KnowledgeDocumentDto, RenameSessionRequest
 from app.core.dependencies import get_chat_service, get_current_user, get_document_service, get_session_service
+from app.core.errors import AppError
 from app.domain import SessionSettings
 from app.prompt_templates import get_template, list_templates
 from app.llm.streaming import event_stream
@@ -49,7 +50,10 @@ def delete_session(
     session_service: SessionService = Depends(get_session_service),
     user_id: str = Depends(get_current_user),
 ):
-    session_service.delete_session(session_id)
+    try:
+        session_service.delete_session(session_id, user_id=user_id)
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.patch('/sessions/{session_id}')
@@ -59,9 +63,12 @@ def rename_session(
     session_service: SessionService = Depends(get_session_service),
     user_id: str = Depends(get_current_user),
 ):
-    session = session_service.rename_session(session_id, payload.title.strip())
+    try:
+        session = session_service.rename_session(session_id, payload.title.strip(), user_id=user_id)
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     if not session:
-        raise HTTPException(status_code=404, detail='会话不存在')
+        raise HTTPException(status_code=400, detail='标题不能为空')
     return session
 
 
@@ -71,7 +78,10 @@ def list_messages(
     session_service: SessionService = Depends(get_session_service),
     user_id: str = Depends(get_current_user),
 ):
-    return session_service.list_messages(session_id)
+    try:
+        return session_service.list_messages(session_id, user_id=user_id)
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get('/documents', response_model=list[KnowledgeDocumentDto])
@@ -148,7 +158,10 @@ async def chat_stream(
         enable_agent_mode=payload.settings.enableAgentMode,
         enable_web_search=payload.settings.enableWebSearch,
     )
-    stream = chat_service.stream_chat(payload.sessionId, payload.message, settings, user_id=user_id)
+    try:
+        stream = chat_service.stream_chat(payload.sessionId, payload.message, settings, user_id=user_id)
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     async def _with_disconnect_check():
         try:
@@ -157,6 +170,14 @@ async def chat_stream(
                     await stream.aclose()
                     return
                 yield event
+        except AppError as exc:
+            yield {
+                'type': 'error',
+                'sessionId': payload.sessionId or '',
+                'messageId': '',
+                'meta': {'message': exc.detail, 'statusCode': exc.status_code},
+            }
+            return
         except (GeneratorExit, asyncio.CancelledError):
             await stream.aclose()
             raise

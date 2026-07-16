@@ -16,12 +16,14 @@ class AgentContext:
         retrieved_chunks: list[RetrievedChunk] | None = None,
         temperature: float = 0.7,
         model: str = '',
+        final_answer: str = '',  # 专用于 reviewer 等需要查看最终回答的场景
     ) -> None:
         self.question = question
         self.history_context = history_context
         self.retrieved_chunks = retrieved_chunks or []
         self.temperature = temperature
         self.model = model
+        self.final_answer = final_answer
 
 
 class BaseAgent:

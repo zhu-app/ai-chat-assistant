@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from typing import Any
 
 from app.domain import RetrievedChunk
 from app.infrastructure.retrieval.embedding_engine import EmbeddingEngine
@@ -44,18 +45,36 @@ class VectorRetriever(RetrievalRepository):
 
         with sqlite3.connect(self.db_path) as connection:
             connection.row_factory = sqlite3.Row
-            rows = connection.execute(
-                '''
-                SELECT dc.document_id, d.filename, dc.content, dc.chunk_index, dcv.vector_json
-                FROM document_chunk_vectors dcv
-                JOIN document_chunks dc ON dc.id = dcv.chunk_id
-                JOIN documents d ON d.id = dc.document_id
-                WHERE d.status = 'ready'
-                ORDER BY d.created_at DESC, dc.chunk_index ASC
-                '''
-            ).fetchall()
+            connection.execute('PRAGMA journal_mode=WAL')
+            # 将 document_ids 过滤下推到 SQL 层，避免全表扫描
+            if document_ids:
+                placeholders = ','.join('?' * len(document_ids))
+                params: list[Any] = document_ids
+                rows = connection.execute(
+                    f'''
+                    SELECT dc.document_id, d.filename, dc.content, dc.chunk_index, dcv.vector_json
+                    FROM document_chunk_vectors dcv
+                    JOIN document_chunks dc ON dc.id = dcv.chunk_id
+                    JOIN documents d ON d.id = dc.document_id
+                    WHERE d.status = 'ready' AND dc.document_id IN ({placeholders})
+                    ORDER BY d.created_at DESC, dc.chunk_index ASC
+                    ''',
+                    params,
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    '''
+                    SELECT dc.document_id, d.filename, dc.content, dc.chunk_index, dcv.vector_json
+                    FROM document_chunk_vectors dcv
+                    JOIN document_chunks dc ON dc.id = dcv.chunk_id
+                    JOIN documents d ON d.id = dc.document_id
+                    WHERE d.status = 'ready'
+                    ORDER BY d.created_at DESC, dc.chunk_index ASC
+                    '''
+                ).fetchall()
 
-        filtered_rows = [row for row in rows if not document_ids or row['document_id'] in document_ids]
+        # 注：document_ids 为空时不过滤（返回所有文档结果）
+        filtered_rows = rows if not document_ids else rows
         if not filtered_rows:
             return []
 

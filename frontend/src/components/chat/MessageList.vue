@@ -46,6 +46,8 @@ const props = defineProps<{
   agentSteps: AgentStep[];
   agentReview: AgentReviewInfo | null;
   promptOptimize: PromptOptimizeInfo | null;
+  isStreaming: boolean;
+  enablePromptOptimizer: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -56,6 +58,17 @@ const listRef = ref<HTMLDivElement | null>(null);
 const copiedMessageId = ref<string | null>(null);
 const showOptimizedPrompt = ref(false);
 const showAgentDetails = ref(true);
+
+// 判断消息是否为最后一条用户消息（用于内联显示 Prompt 优化结果）
+// 注意：不能用 index === messages.length-1，因为 assistant 消息在后面追加
+const isLastUserMessage = (index: number) => {
+  const msg = props.messages[index];
+  if (!msg || msg.role !== 'user') return false;
+  for (let i = props.messages.length - 1; i >= 0; i--) {
+    if (props.messages[i]?.role === 'user') return i === index;
+  }
+  return false;
+};
 
 const assistantEntries = computed(() => props.messages.filter((message) => message.role === 'assistant'));
 
@@ -123,30 +136,6 @@ const stepIcon = (status: string) => {
 
 <template>
   <div ref="listRef" class="message-list">
-    <!-- ═══ Prompt 优化提示 ═══ -->
-    <div v-if="promptOptimize && !promptOptimize.skipped" class="agent-banner agent-banner--prompt">
-      <div class="agent-banner__header" @click="showOptimizedPrompt = !showOptimizedPrompt">
-        <span>✨ 提问已优化</span>
-        <small>{{ showOptimizedPrompt ? '收起' : '展开' }}</small>
-      </div>
-      <div v-if="showOptimizedPrompt" class="agent-banner__body">
-        <div class="opt-compare">
-          <div class="opt-compare__item">
-            <small class="opt-compare__label">原始提问</small>
-            <p class="opt-compare__text">{{ promptOptimize.original }}</p>
-          </div>
-          <div class="opt-compare__arrow">→</div>
-          <div class="opt-compare__item">
-            <small class="opt-compare__label">优化后</small>
-            <p class="opt-compare__text opt-compare__text--optimized">{{ promptOptimize.optimized }}</p>
-          </div>
-        </div>
-        <div v-if="promptOptimize.strategies.length" class="opt-strategies">
-          <small>策略：{{ promptOptimize.strategies.join('、') }}</small>
-        </div>
-        <small class="opt-reason">{{ promptOptimize.reason }}</small>
-      </div>
-    </div>
 
     <!-- ═══ Agent 工作流进度 ═══ -->
     <div v-if="agentSteps.length" class="agent-workflow">
@@ -217,6 +206,41 @@ const stepIcon = (status: string) => {
                   <span>片段 {{ (source.chunkIndex ?? 0) + 1 }} · 相关度 {{ Number(source.score ?? 0).toFixed(0) }}</span>
                   <p v-if="source.preview" class="message-source-card__preview">{{ source.preview }}</p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ Prompt 优化结果（内联在用户消息下方） ═══ -->
+          <div v-if="message.role === 'user' && isLastUserMessage(index) && enablePromptOptimizer">
+            <!-- 优化中提示：流式进行中 + 还没有优化结果返回 → 正在优化 -->
+            <div v-if="isStreaming && !promptOptimize" class="opt-inline opt-inline--pending">
+              <span class="opt-inline__icon">✨</span>
+              <span>正在优化提问</span>
+              <span class="opt-inline__spinner" />
+            </div>
+            <!-- 优化完成 -->
+            <div v-else-if="promptOptimize && !promptOptimize.skipped" class="opt-inline">
+              <div class="opt-inline__header" @click="showOptimizedPrompt = !showOptimizedPrompt">
+                <span class="opt-inline__icon">✨</span>
+                <span>提问已优化</span>
+                <small class="opt-inline__toggle">{{ showOptimizedPrompt ? '收起' : '查看详情' }}</small>
+              </div>
+              <div v-if="showOptimizedPrompt" class="opt-inline__body">
+                <div class="opt-compare">
+                  <div class="opt-compare__item">
+                    <small class="opt-compare__label">原始</small>
+                    <p class="opt-compare__text">{{ promptOptimize.original }}</p>
+                  </div>
+                  <div class="opt-compare__arrow">→</div>
+                  <div class="opt-compare__item">
+                    <small class="opt-compare__label">优化后</small>
+                    <p class="opt-compare__text opt-compare__text--optimized">{{ promptOptimize.optimized }}</p>
+                  </div>
+                </div>
+                <div v-if="promptOptimize.strategies.length" class="opt-strategies">
+                  <small>策略：{{ promptOptimize.strategies.join('、') }}</small>
+                </div>
+                <small class="opt-reason">{{ promptOptimize.reason }}</small>
               </div>
             </div>
           </div>

@@ -15,6 +15,7 @@ class HybridRetriever(RetrievalRepository):
         vector_min_score: float = 0.12,
     ) -> None:
         self.top_k = top_k
+        self._embedding_engine = embedding_engine
         # 无远程 embedding 时使用更低阈值
         if not embedding_engine.client:
             vector_min_score = 0.02
@@ -55,3 +56,7 @@ class HybridRetriever(RetrievalRepository):
             return keyword_hits
 
         return self._merge(vector_hits, keyword_hits)
+
+    @property
+    def embedding_mode(self) -> str:
+        return 'hash_degraded' if self._embedding_engine.is_degraded else 'remote'
