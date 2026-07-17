@@ -34,6 +34,8 @@
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
 }
 
 /* --- Light Theme --- */
@@ -60,6 +62,8 @@
   --overlay: rgba(0, 0, 0, 0.3);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -621,30 +625,38 @@ button {
   scroll-behavior: smooth;
 }
 
-/* 自定义滚动条 */
+/* 自定义滚动条 — 豆包风格 */
 .chat-stage::-webkit-scrollbar,
 .session-list::-webkit-scrollbar,
 .document-list::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .chat-stage::-webkit-scrollbar-track,
 .session-list::-webkit-scrollbar-track,
 .document-list::-webkit-scrollbar-track {
   background: transparent;
+  border-radius: 4px;
 }
 
 .chat-stage::-webkit-scrollbar-thumb,
 .session-list::-webkit-scrollbar-thumb,
 .document-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: var(--scrollbar-thumb, rgba(0, 0, 0, 0.12));
+  border-radius: 4px;
+  transition: background 0.2s ease;
 }
 
 .chat-stage::-webkit-scrollbar-thumb:hover,
 .session-list::-webkit-scrollbar-thumb:hover,
 .document-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--scrollbar-thumb-hover, rgba(0, 0, 0, 0.25));
+}
+
+/* Firefox 滚动条 */
+.chat-stage {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb, rgba(0, 0, 0, 0.12)) transparent;
 }
 
 /* 空状态 */
