@@ -93,6 +93,7 @@ const selectTemplate = async (templateId: string) => {
       placeholder="发一条消息，开始新的多轮对话。"
       @input="handleInput"
       @keydown.enter.exact.prevent="onSubmit"
+      @keydown.escape.prevent="isStreaming && emit('stop')"
     />
 
     <div class="composer__actions">
@@ -105,7 +106,7 @@ const selectTemplate = async (templateId: string) => {
         >
           📋
         </button>
-        <small>Enter 发送 · Shift + Enter 换行</small>
+        <small>Enter 发送 · Shift+Enter 换行 · Esc 停止</small>
       </div>
       <button
         class="primary-button"

@@ -17,6 +17,16 @@ import { readJson, writeJson } from '../utils/storage';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
 
+const authHeaders = (): Record<string, string> => {
+  const token = (() => {
+    try {
+      const raw = localStorage.getItem('ai-chat-mvp:token');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const { user, guestLogin, logout } = useAuth();
 const showLoginModal = ref(false);
 const toast = useToast();
@@ -318,6 +328,28 @@ const handleExport = () => {
 
 // 导出对话为图片
 const isExportingImage = ref(false);
+const isSharing = ref(false);
+
+// 分享对话
+const handleShare = async () => {
+  if (!currentSessionId.value) return;
+  isSharing.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${currentSessionId.value}/share`, {
+      method: 'POST',
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) throw new Error('分享失败');
+    const data = await res.json();
+    const shareUrl = `${window.location.origin}${data.shareUrl}`;
+    await navigator.clipboard.writeText(shareUrl);
+    toast.success('分享链接已复制到剪贴板');
+  } catch {
+    toast.error('分享失败');
+  } finally {
+    isSharing.value = false;
+  }
+};
 const handleExportImage = async () => {
   if (!messages.value.length) return;
   isExportingImage.value = true;
@@ -389,6 +421,9 @@ const handleExportImage = async () => {
           </button>
           <button class="icon-button" title="导出对话(图片)" @click="handleExportImage" :disabled="!hasMessages || isExportingImage">
             📷
+          </button>
+          <button class="icon-button" title="分享对话" @click="handleShare" :disabled="!hasMessages || isSharing || !currentSessionId">
+            🔗
           </button>
           <button
             class="icon-button telemetry-btn"

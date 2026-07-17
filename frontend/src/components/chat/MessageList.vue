@@ -124,6 +124,20 @@ const canRetry = (messageIndex: number) => {
   return false;
 };
 
+// 格式化时间
+const formatTime = (iso: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} 小时前`;
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 // Agent 步骤状态图标
 const stepIcon = (status: string) => {
   if (status === 'running') return '⏳';
@@ -183,7 +197,10 @@ const stepIcon = (status: string) => {
       </div>
 
       <div class="message-item__body">
-        <div class="message-item__label">{{ message.role === 'user' ? '你' : 'AI' }}</div>
+        <div class="message-item__label">
+          <span>{{ message.role === 'user' ? '你' : 'AI' }}</span>
+          <span class="message-item__time">{{ formatTime(message.createdAt) }}</span>
+        </div>
 
         <div class="message-item__bubble">
           <div

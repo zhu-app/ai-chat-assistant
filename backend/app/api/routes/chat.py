@@ -3,11 +3,15 @@ import asyncio
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+from uuid import uuid4
+
 from app.api.schemas.chat import ChatStreamRequest, KnowledgeDocumentDto, RenameSessionRequest
-from app.core.dependencies import get_chat_service, get_current_user, get_document_service, get_session_service
+from app.core.config import settings
+from app.core.dependencies import get_chat_service, get_current_user, get_document_service, get_session_repository, get_session_service
 from app.core.errors import AppError
 from app.domain import SessionSettings
 from app.prompt_templates import get_template, list_templates
+from app.infrastructure.persistence.sqlite_session_repository import SqliteSessionRepository
 from app.llm.streaming import event_stream
 from app.services.chat_service import ChatService
 from app.services.document_service import DocumentService, DocumentValidationError
@@ -117,6 +121,55 @@ def delete_document(
     if not deleted:
         raise HTTPException(status_code=404, detail='文档不存在')
     # 如果文档存在但不属于自己，delete_document 返回 None
+
+
+@router.post('/sessions/{session_id}/share')
+def share_session(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+    session_repository: SqliteSessionRepository = Depends(get_session_repository),
+    user_id: str = Depends(get_current_user),
+):
+    """生成对话分享链接。"""
+    try:
+        # 验证会话所有权
+        session_service.require_session_owner(session_id, user_id)
+        share_token = str(uuid4())
+        # 创建 share_tokens 表（幂等）
+        with session_repository._connect() as conn:
+            conn.execute('''CREATE TABLE IF NOT EXISTS share_tokens (
+                token TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )''')
+            conn.execute('INSERT OR REPLACE INTO share_tokens (token, session_id, created_at) VALUES (?, ?, datetime("now"))',
+                         (share_token, session_id))
+        return {'shareUrl': f'/share/{share_token}', 'token': share_token}
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get('/sessions/shared/{share_token}')
+def get_shared_session(
+    share_token: str,
+):
+    """获取分享的对话内容（无需登录）。"""
+    db_path = settings.sqlite_path
+    repo = SqliteSessionRepository(db_path)
+    with repo._connect() as conn:
+        row = conn.execute('SELECT session_id FROM share_tokens WHERE token = ?', (share_token,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail='分享链接无效或已过期')
+        session_id = row['session_id']
+    # 直接通过 repository 获取会话和消息（无需登录），绕过 session_service 的权限检查
+    session = repo.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail='会话不存在')
+    messages = repo.list_messages(session_id)
+    return {
+        'session': {'id': session.id, 'title': session.title},
+        'messages': [{'role': m.role, 'content': m.content, 'createdAt': m.created_at} for m in messages],
+    }
 
 
 @router.get('/templates')
