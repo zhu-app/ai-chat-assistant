@@ -1,7 +1,9 @@
 # AI Chat Assistant 🤖
 
 [![在线体验](https://img.shields.io/badge/在线体验-139.199.230.22-blue?style=for-the-badge)](http://139.199.230.22/)
-[![GitHub stars](https://img.shields.io/github/stars/zhu-app/ai-chat-assistant?style=for-the-badge)](https://github.com/zhu-app/ai-chat-assistant)
+[![Vue 3](https://img.shields.io/badge/Vue_3-4FC08D?style=for-the-badge&logo=vue.js)](https://vuejs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker)](https://docker.com)
 
 > 一个生产就绪的全栈 AI 聊天应用，支持多用户、知识库 RAG、流式回复。  
 > 🚀 **核心亮点：Prompt 优化引擎 + Multi-Agent 协作系统 + 知识库 RAG + 对话分享**  
