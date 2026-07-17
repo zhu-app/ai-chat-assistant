@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import type { KnowledgeDocument, SessionSettings } from '../../types/chat';
 import { readJson, writeJson } from '../../utils/storage';
 
@@ -66,23 +66,6 @@ const handleUpload = (event: Event) => {
 const presetName = ref('');
 const STORAGE_KEY = 'ai-chat-mvp:prompt-presets';
 const savedPresets = ref<Array<{ name: string; prompt: string }>>(readJson(STORAGE_KEY, []));
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
-
-// 从后端加载推荐角色
-const defaultRoles = ref<Array<{ name: string; prompt: string; msg: string }>>([]);
-onMounted(async () => {
-  try {
-    const res = await fetch(`${API_BASE}/templates`);
-    if (res.ok) {
-      const templates = await res.json();
-      defaultRoles.value = templates.map((t: any) => ({
-        name: t.title,
-        prompt: t.system_prompt || '',
-        msg: t.suggested_message || '',
-      }));
-    }
-  } catch { /* ignore */ }
-});
 
 const savePreset = () => {
   const name = presetName.value.trim();
@@ -150,14 +133,6 @@ const toggleSection = (name: string) => {
             placeholder="例如：你是一个专业的编程助手…" class="field__textarea" />
         </label>
         <div class="preset-area">
-          <div v-if="defaultRoles.length" class="preset-area__group">
-            <div class="preset-area__group-label">推荐角色</div>
-            <div class="preset-area__chips">
-              <button v-for="role in defaultRoles" :key="role.name"
-                class="preset-chip preset-chip--default" :class="{ 'preset-chip--active': settings.systemPrompt === role.prompt }"
-                @click="applyPreset(role.prompt)">{{ role.name }}</button>
-            </div>
-          </div>
           <div v-if="savedPresets.length" class="preset-area__group">
             <div class="preset-area__group-label">我的预设</div>
             <div class="preset-area__chips">
