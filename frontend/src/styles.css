@@ -1589,6 +1589,12 @@ button {
   font-weight: 500;
 }
 
+.field__row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .field input,
 .field textarea {
   width: 100%;
@@ -1664,6 +1670,36 @@ button {
 .field__select option {
   background: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+.field__value-tag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.field__textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.6;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.field__textarea:focus {
+  border-color: var(--accent);
 }
 
 /* 温度范围标签 */
@@ -1855,97 +1891,118 @@ button {
   opacity: 0.9;
 }
 
+/* ── 设置面板分组 ── */
+.settings-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.settings-section + .settings-section {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.settings-section__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ── 系统提示词预设 ── */
-.field-presets {
-  margin-top: 6px;
+.preset-area {
   display: grid;
   gap: 6px;
 }
 
-.field-presets__save {
-  display: flex;
-  gap: 4px;
-}
-
-.field-presets__input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 12px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  outline: none;
-}
-
-.field-presets__input:focus {
-  border-color: var(--accent);
-}
-
-.field-presets__btn {
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--accent);
-  color: var(--accent-text);
-  cursor: pointer;
-  transition: opacity 0.12s ease;
-}
-
-.field-presets__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.field-presets__list {
+.preset-area__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 
-.field-presets__item {
+.preset-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 11px;
+  font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.1s ease;
   background: var(--bg-card);
+  transition: all 0.12s ease;
 }
 
-.field-presets__item:hover {
+.preset-chip:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.field-presets__item--active {
+.preset-chip--active {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
 
-.field-presets__item-name {
-  font-weight: 500;
-}
-
-.field-presets__item-del {
-  background: none;
-  border: 0;
+.preset-chip__del {
   font-size: 9px;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
+  opacity: 0.5;
+  margin-left: 2px;
 }
 
-.field-presets__item-del:hover {
+.preset-chip__del:hover {
+  opacity: 1;
   color: var(--danger);
+}
+
+.preset-area__save {
+  display: flex;
+  gap: 4px;
+}
+
+.preset-area__input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  outline: none;
+}
+
+.preset-area__input:focus {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.preset-area__btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 500;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+  flex-shrink: 0;
+}
+
+.preset-area__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .upload-zone--drag {
