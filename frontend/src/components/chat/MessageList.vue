@@ -366,7 +366,7 @@ const stepIcon = (status: string) => {
             >
               重试
             </button>
-            <button type="button" class="message-action message-action--share" @click="emitShare(message)">
+            <button type="button" class="message-action message-action--share" @click="emitShare()">
               分享
             </button>
           </div>
