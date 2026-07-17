@@ -22,6 +22,10 @@ class ChatStreamRequest(BaseModel):
     settings: SessionSettingsDto = Field(default_factory=SessionSettingsDto)
 
 
+class EditMessageRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=10000)
+
+
 class KnowledgeDocumentDto(BaseModel):
     id: str
     filename: str

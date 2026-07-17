@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from uuid import uuid4
 
-from app.api.schemas.chat import ChatStreamRequest, KnowledgeDocumentDto, RenameSessionRequest
+from app.api.schemas.chat import ChatStreamRequest, EditMessageRequest, KnowledgeDocumentDto, RenameSessionRequest
 from app.core.config import settings
 from app.core.dependencies import get_chat_service, get_current_user, get_document_service, get_session_repository, get_session_service
 from app.core.errors import AppError
@@ -84,6 +84,29 @@ def list_messages(
 ):
     try:
         return session_service.list_messages(session_id, user_id=user_id)
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.patch('/sessions/{session_id}/messages/{message_id}')
+def edit_message(
+    session_id: str,
+    message_id: str,
+    payload: EditMessageRequest,
+    session_service: SessionService = Depends(get_session_service),
+    user_id: str = Depends(get_current_user),
+):
+    """编辑消息内容（仅限自己的消息）。"""
+    try:
+        session_service.require_session_owner(session_id, user_id)
+        messages = session_service.list_messages(session_id, user_id=user_id)
+        for msg in messages:
+            if msg.id == message_id and msg.role == 'user':
+                from app.infrastructure.persistence.sqlite_session_repository import SqliteSessionRepository
+                repo = SqliteSessionRepository(settings.sqlite_path)
+                repo.update_message_content(message_id, payload.content)
+                return {'ok': True}
+        raise HTTPException(status_code=404, detail='消息不存在或无权编辑')
     except AppError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

@@ -71,6 +71,30 @@ const {
 } = useSettings();
 const { draft, clearDraft } = useComposer(() => currentSessionId.value);
 
+// 欢迎页场景模板
+const welcomeTemplates = ref<Array<{id: string; emoji: string; title: string; description: string; msg: string}>>([
+  { id: 'write', emoji: '✍️', title: '写作助手', description: '写文章、邮件、报告', msg: '请帮我写一篇关于人工智能发展的简短文章，适合初学者阅读' },
+  { id: 'code', emoji: '💻', title: '编程助手', description: '写代码、Debug、优化', msg: '请用 Python 写一个快速排序算法，并解释它的工作原理' },
+  { id: 'translate', emoji: '🌐', title: '翻译', description: '中英互译、润色', msg: '请帮我把这段中文翻译成英文："人工智能正在改变世界"' },
+  { id: 'summary', emoji: '📝', title: '总结', description: '提炼要点、归纳内容', msg: '请解释什么是 RAG（检索增强生成），它的工作原理是什么' },
+  { id: 'brainstorm', emoji: '💡', title: '头脑风暴', description: '创意灵感、方案策划', msg: '我想做一个 AI 聊天应用，请帮我 brainstorm 一些核心功能和亮点' },
+  { id: 'learn', emoji: '📖', title: '学习助手', description: '概念解释、知识问答', msg: '请用通俗易懂的方式解释什么是数据库索引，为什么它能加速查询' },
+]);
+const applyWelcomeTemplate = async (t: typeof welcomeTemplates.value[0]) => {
+  draft.value = t.msg;
+  // 如果模板有对应的 system prompt，应用它
+  try {
+    const res = await fetch(`${API_BASE}/templates`);
+    if (res.ok) {
+      const templates = await res.json();
+      const match = templates.find((tmpl: any) => tmpl.title === t.title);
+      if (match) {
+        updateSettings({ ...settings.value, systemPrompt: match.system_prompt || settings.value.systemPrompt });
+      }
+    }
+  } catch { /* ignore */ }
+};
+
 // 当前会话的本地引用（解决 vue-tsc ComputedRef 类型推断问题）
 const sessionInfo = computed(() => currentSession.value);
 
@@ -473,9 +497,23 @@ const handleExportImage = async () => {
           @share="handleShare"
         />
         <div v-else class="empty-stage">
-          <h3>输入你的第一个问题</h3>
-          <p>上传文档后，勾选右侧知识库文档并启用 RAG，就能基于文档进行问答。</p>
-          <p class="empty-stage__hint">还可开启 ✨ Prompt 优化 或 🤖 Agent 协作模式体验更强大的能力。</p>
+          <div class="empty-stage__welcome">
+            <h2>👋 开始对话</h2>
+            <p class="empty-stage__sub">选择一个场景开始，或直接输入你的问题</p>
+          </div>
+          <div class="empty-stage__quick-actions">
+            <button
+              v-for="t in welcomeTemplates"
+              :key="t.id"
+              class="quick-action-card"
+              @click="applyWelcomeTemplate(t)"
+            >
+              <span class="quick-action-card__icon">{{ t.emoji }}</span>
+              <span class="quick-action-card__title">{{ t.title }}</span>
+              <span class="quick-action-card__desc">{{ t.description }}</span>
+            </button>
+          </div>
+          <p class="empty-stage__hint">💡 右侧面板可开启 RAG 知识库、Agent 协作、Prompt 优化等增强功能</p>
         </div>
       </section>
 

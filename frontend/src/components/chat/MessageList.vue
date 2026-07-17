@@ -69,6 +69,50 @@ const toggleAgentDetail = (msgId: string) => {
   expandedAgentMsg.value = expandedAgentMsg.value === msgId ? null : msgId;
 };
 
+// ── 消息编辑 ──
+const editingMessageId = ref<string | null>(null);
+const editMessageContent = ref('');
+const editTextarea = ref<HTMLTextAreaElement | null>(null);
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+
+const authHeaders = (): Record<string, string> => {
+  const token = (() => {
+    try {
+      const raw = localStorage.getItem('ai-chat-mvp:token');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const startEdit = (message: ChatMessage) => {
+  editingMessageId.value = message.id;
+  editMessageContent.value = message.content;
+  nextTick(() => editTextarea.value?.focus());
+};
+
+const saveEdit = async (messageId: string) => {
+  const content = editMessageContent.value.trim();
+  if (!content) return;
+  try {
+    const msg = props.messages.find(m => m.id === messageId);
+    if (!msg) return;
+    const res = await fetch(`${API_BASE}/sessions/${msg.sessionId}/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ content }),
+    });
+    if (res.ok) {
+      msg.content = content;
+    }
+  } catch { /* ignore */ }
+  editingMessageId.value = null;
+};
+
+const cancelEdit = () => {
+  editingMessageId.value = null;
+};
+
 // 判断消息是否为最后一条用户消息（用于内联显示 Prompt 优化结果）
 // 注意：不能用 index === messages.length-1，因为 assistant 消息在后面追加
 const isLastUserMessage = (index: number) => {
@@ -212,8 +256,24 @@ const stepIcon = (status: string) => {
         </div>
 
         <div class="message-item__bubble">
+          <!-- 编辑模式（用户消息） -->
+          <div v-if="editingMessageId === message.id" class="message-edit">
+            <textarea
+              class="message-edit__input"
+              v-model="editMessageContent"
+              rows="3"
+              @keydown.enter.exact.prevent="saveEdit(message.id)"
+              @keydown.escape.prevent="cancelEdit"
+              ref="editTextarea"
+            />
+            <div class="message-edit__actions">
+              <button class="message-edit__btn message-edit__btn--save" @click="saveEdit(message.id)">保存</button>
+              <button class="message-edit__btn" @click="cancelEdit">取消</button>
+            </div>
+          </div>
+          <!-- 显示模式 -->
           <div
-            v-if="message.content"
+            v-else-if="message.content"
             class="message-item__content"
             v-html="renderMessageContent(message.content)"
           />
@@ -269,6 +329,16 @@ const stepIcon = (status: string) => {
                 <small class="opt-reason">{{ promptOptimize.reason }}</small>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- 用户消息操作：编辑 -->
+        <div v-if="message.role === 'user' && message.status === 'done'" class="message-item__actions">
+          <span class="message-item__time">{{ formatTime(message.createdAt) }}</span>
+          <div class="message-item__actions-right">
+            <button type="button" class="message-action" @click="startEdit(message)">
+              编辑
+            </button>
           </div>
         </div>
 

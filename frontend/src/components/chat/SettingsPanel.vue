@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { KnowledgeDocument, SessionSettings } from '../../types/chat';
+import { readJson, writeJson } from '../../utils/storage';
 
 const props = defineProps<{
   settings: SessionSettings;
@@ -77,6 +78,28 @@ const handleDrop = (e: DragEvent) => {
   const files = Array.from(e.dataTransfer?.files ?? []);
   if (files.length) emit('upload', files);
 };
+
+// ── 系统提示词预设 ──
+const presetName = ref('');
+const STORAGE_KEY = 'ai-chat-mvp:prompt-presets';
+const savedPresets = ref<Array<{ name: string; prompt: string }>>(readJson(STORAGE_KEY, []));
+
+const savePreset = () => {
+  const name = presetName.value.trim();
+  if (!name || !props.settings.systemPrompt.trim()) return;
+  savedPresets.value = [...savedPresets.value.filter(p => p.name !== name), { name, prompt: props.settings.systemPrompt }];
+  writeJson(STORAGE_KEY, savedPresets.value);
+  presetName.value = '';
+};
+
+const applyPreset = (prompt: string) => {
+  emit('update', { ...props.settings, systemPrompt: prompt });
+};
+
+const deletePreset = (name: string) => {
+  savedPresets.value = savedPresets.value.filter(p => p.name !== name);
+  writeJson(STORAGE_KEY, savedPresets.value);
+};
 </script>
 
 <template>
@@ -121,8 +144,34 @@ const handleDrop = (e: DragEvent) => {
         rows="4"
         :value="settings.systemPrompt"
         @input="handleSystemPromptInput"
+        placeholder="例如：你是一个专业的编程助手…"
       />
     </label>
+
+    <!-- 系统提示词预设 -->
+    <div class="field-presets">
+      <div class="field-presets__save">
+        <input
+          class="field-presets__input"
+          v-model="presetName"
+          placeholder="保存为预设…"
+          @keydown.enter.prevent="savePreset"
+        />
+        <button class="field-presets__btn" @click="savePreset" :disabled="!presetName.trim() || !settings.systemPrompt.trim()">保存</button>
+      </div>
+      <div v-if="savedPresets.length" class="field-presets__list">
+        <div
+          v-for="preset in savedPresets"
+          :key="preset.name"
+          class="field-presets__item"
+          :class="{ 'field-presets__item--active': settings.systemPrompt === preset.prompt }"
+          @click="applyPreset(preset.prompt)"
+        >
+          <span class="field-presets__item-name">{{ preset.name }}</span>
+          <button class="field-presets__item-del" @click.stop="deletePreset(preset.name)">✕</button>
+        </div>
+      </div>
+    </div>
 
     <!-- RAG 开关 -->
     <label class="field field--row">

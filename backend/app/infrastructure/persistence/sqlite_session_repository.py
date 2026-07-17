@@ -143,6 +143,10 @@ class SqliteSessionRepository(SessionRepository):
             ).fetchall()
         return [self._to_message(row) for row in rows]
 
+    def update_message_content(self, message_id: str, content: str) -> None:
+        with self._connect() as connection:
+            connection.execute('UPDATE messages SET content = ? WHERE id = ?', (content, message_id))
+
     def touch_session(self, session_id: str, title: str | None = None, temperature: float | None = None) -> ChatSession | None:
         session = self.get_session(session_id)
         if not session:
