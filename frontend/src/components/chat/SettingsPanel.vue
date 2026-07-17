@@ -100,119 +100,113 @@ const deletePreset = (name: string) => {
   savedPresets.value = savedPresets.value.filter(p => p.name !== name);
   writeJson(STORAGE_KEY, savedPresets.value);
 };
+
+// 折叠状态
+const openSections = ref<Record<string, boolean>>({
+  model: false,
+  role: true,
+  features: true,
+  docs: false,
+});
+const toggleSection = (name: string) => {
+  openSections.value[name] = !openSections.value[name];
+};
 </script>
 
 <template>
   <section class="settings-panel">
     <div class="panel-title">设置</div>
 
-    <!-- ═══ 模型与参数 ═══ -->
+    <!-- ═══ 模型与参数 ═══（默认折叠） -->
     <div class="settings-section">
-      <div class="settings-section__title">模型与参数</div>
-
-      <label class="field">
-        <span>模型</span>
-        <select :value="settings.model" @change="handleModelChange" class="field__select">
-          <option v-for="model in AVAILABLE_MODELS" :key="model.value" :value="model.value">
-            {{ model.label }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field__row-label">
-          创造力度
-          <small class="field__value-tag">{{ settings.temperature.toFixed(1) }}</small>
-        </span>
-        <input type="range" min="0" max="1.5" step="0.1" :value="settings.temperature" @input="handleTemperatureInput" />
-        <div class="field__range-labels">
-          <small>严谨</small>
-          <small>自由</small>
-        </div>
-      </label>
+      <div class="settings-section__title settings-section__title--clickable" @click="toggleSection('model')">
+        <span>模型与参数</span>
+        <span class="settings-section__arrow">{{ openSections.model ? '▾' : '▸' }}</span>
+      </div>
+      <div v-if="openSections.model" class="settings-section__body">
+        <label class="field">
+          <span>模型</span>
+          <select :value="settings.model" @change="handleModelChange" class="field__select">
+            <option v-for="model in AVAILABLE_MODELS" :key="model.value" :value="model.value">{{ model.label }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__row-label">创造力度 <small class="field__value-tag">{{ settings.temperature.toFixed(1) }}</small></span>
+          <input type="range" min="0" max="1.5" step="0.1" :value="settings.temperature" @input="handleTemperatureInput" />
+          <div class="field__range-labels"><small>严谨</small><small>自由</small></div>
+        </label>
+      </div>
     </div>
 
-    <!-- ═══ AI 角色设定 ═══（核心，放在最前面） -->
+    <!-- ═══ AI 角色设定 ═══（默认展开） -->
     <div class="settings-section">
-      <div class="settings-section__title">AI 角色设定</div>
-
-      <label class="field">
-        <textarea rows="3" :value="settings.systemPrompt" @input="handleSystemPromptInput"
-          placeholder="例如：你是一个专业的编程助手…" class="field__textarea" />
-      </label>
-
-      <!-- 预设 -->
-      <div class="preset-area">
-        <!-- 推荐角色（从后端加载） -->
-        <div v-if="defaultRoles.length" class="preset-area__group">
-          <div class="preset-area__group-label">推荐角色</div>
-          <div class="preset-area__chips">
-            <button v-for="role in defaultRoles" :key="role.name"
-              class="preset-chip preset-chip--default"
-              :class="{ 'preset-chip--active': settings.systemPrompt === role.prompt }"
-              @click="applyPreset(role.prompt)">
-              {{ role.name }}
-            </button>
+      <div class="settings-section__title settings-section__title--clickable" @click="toggleSection('role')">
+        <span>AI 角色设定</span>
+        <span class="settings-section__arrow">{{ openSections.role ? '▾' : '▸' }}</span>
+      </div>
+      <div v-if="openSections.role" class="settings-section__body">
+        <label class="field">
+          <textarea rows="3" :value="settings.systemPrompt" @input="handleSystemPromptInput"
+            placeholder="例如：你是一个专业的编程助手…" class="field__textarea" />
+        </label>
+        <div class="preset-area">
+          <div v-if="defaultRoles.length" class="preset-area__group">
+            <div class="preset-area__group-label">推荐角色</div>
+            <div class="preset-area__chips">
+              <button v-for="role in defaultRoles" :key="role.name"
+                class="preset-chip preset-chip--default" :class="{ 'preset-chip--active': settings.systemPrompt === role.prompt }"
+                @click="applyPreset(role.prompt)">{{ role.name }}</button>
+            </div>
           </div>
-        </div>
-        <!-- 用户自定义预设 -->
-        <div v-if="savedPresets.length" class="preset-area__group">
-          <div class="preset-area__group-label">我的预设</div>
-          <div class="preset-area__chips">
-            <button v-for="preset in savedPresets" :key="preset.name"
-              class="preset-chip"
-              :class="{ 'preset-chip--active': settings.systemPrompt === preset.prompt }"
-              @click="applyPreset(preset.prompt)">
-              {{ preset.name }}
-              <span class="preset-chip__del" @click.stop="deletePreset(preset.name)">✕</span>
-            </button>
+          <div v-if="savedPresets.length" class="preset-area__group">
+            <div class="preset-area__group-label">我的预设</div>
+            <div class="preset-area__chips">
+              <button v-for="preset in savedPresets" :key="preset.name"
+                class="preset-chip" :class="{ 'preset-chip--active': settings.systemPrompt === preset.prompt }"
+                @click="applyPreset(preset.prompt)">{{ preset.name }}<span class="preset-chip__del" @click.stop="deletePreset(preset.name)">✕</span></button>
+            </div>
           </div>
-        </div>
-        <div class="preset-area__save">
-          <input class="preset-area__input" v-model="presetName" placeholder="保存当前提示词为预设…" @keydown.enter.prevent="savePreset" />
-          <button class="preset-area__btn" @click="savePreset" :disabled="!presetName.trim() || !settings.systemPrompt.trim()">+</button>
+          <div class="preset-area__save">
+            <input class="preset-area__input" v-model="presetName" placeholder="保存预设…" @keydown.enter.prevent="savePreset" />
+            <button class="preset-area__btn" @click="savePreset" :disabled="!presetName.trim() || !settings.systemPrompt.trim()">+</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ═══ 增强功能 ═══ -->
+    <!-- ═══ 增强功能 ═══（默认展开） -->
     <div class="settings-section">
-      <div class="settings-section__title">增强功能</div>
-
-      <label class="field field--row">
-        <span>🌐 联网搜索</span>
-        <input type="checkbox" :checked="settings.enableWebSearch" @change="updateField('enableWebSearch', ($event.target as HTMLInputElement).checked)" />
-      </label>
-      <small class="field-hint" v-if="settings.enableWebSearch">AI 自动搜索互联网获取实时信息</small>
-
-      <label class="field field--row">
-        <span>✨ Prompt 优化</span>
-        <input type="checkbox" :checked="settings.enablePromptOptimizer" @change="updateField('enablePromptOptimizer', ($event.target as HTMLInputElement).checked)" />
-      </label>
-      <small class="field-hint" v-if="settings.enablePromptOptimizer">自动将模糊提问改写为结构化问题</small>
-
-      <label class="field field--row">
-        <span>🤖 Agent 协作</span>
-        <input type="checkbox" :checked="settings.enableAgentMode" @change="updateField('enableAgentMode', ($event.target as HTMLInputElement).checked)" />
-      </label>
-      <small class="field-hint" v-if="settings.enableAgentMode">多 Agent 协作：分析 → 搜索 → 撰写 → 审查</small>
-
-      <label class="field field--row">
-        <span>📚 RAG 知识库</span>
-        <input type="checkbox" :checked="settings.useRag" @change="handleUseRagChange" />
-      </label>
+      <div class="settings-section__title settings-section__title--clickable" @click="toggleSection('features')">
+        <span>增强功能</span>
+        <span class="settings-section__arrow">{{ openSections.features ? '▾' : '▸' }}</span>
+      </div>
+      <div v-if="openSections.features" class="settings-section__body">
+        <label class="field field--row"><span>🌐 联网搜索</span>
+          <input type="checkbox" :checked="settings.enableWebSearch" @change="updateField('enableWebSearch', ($event.target as HTMLInputElement).checked)" /></label>
+        <small class="field-hint" v-if="settings.enableWebSearch">AI 自动搜索互联网获取实时信息</small>
+        <label class="field field--row"><span>✨ Prompt 优化</span>
+          <input type="checkbox" :checked="settings.enablePromptOptimizer" @change="updateField('enablePromptOptimizer', ($event.target as HTMLInputElement).checked)" /></label>
+        <small class="field-hint" v-if="settings.enablePromptOptimizer">自动将模糊提问改写为结构化问题</small>
+        <label class="field field--row"><span>🤖 Agent 协作</span>
+          <input type="checkbox" :checked="settings.enableAgentMode" @change="updateField('enableAgentMode', ($event.target as HTMLInputElement).checked)" /></label>
+        <small class="field-hint" v-if="settings.enableAgentMode">多 Agent 协作：分析 → 搜索 → 撰写 → 审查</small>
+        <label class="field field--row"><span>📚 RAG 知识库</span>
+          <input type="checkbox" :checked="settings.useRag" @change="handleUseRagChange" /></label>
+      </div>
     </div>
 
-    <!-- ═══ 知识库 ═══ -->
+    <!-- ═══ 知识库 ═══（默认折叠） -->
     <div class="settings-section">
-      <div class="settings-section__title">知识库文档</div>
-      <button class="settings-btn" @click="emit('openDocumentManager')">
-        📄 管理文档
-        <span v-if="documents.length" class="settings-btn__badge">{{ documents.length }}</span>
-      </button>
-      <small class="field-hint" v-if="documents.length">
-        {{ settings.documentIds.length }} / {{ documents.length }} 个文档已选中
-      </small>
+      <div class="settings-section__title settings-section__title--clickable" @click="toggleSection('docs')">
+        <span>知识库文档</span>
+        <span class="settings-section__arrow">{{ openSections.docs ? '▾' : '▸' }}</span>
+      </div>
+      <div v-if="openSections.docs" class="settings-section__body">
+        <button class="settings-btn" @click="emit('openDocumentManager')">
+          📄 管理文档 <span v-if="documents.length" class="settings-btn__badge">{{ documents.length }}</span>
+        </button>
+        <small v-if="documents.length" class="field-hint">{{ settings.documentIds.length }} / {{ documents.length }} 个已选中</small>
+      </div>
     </div>
   </section>
 </template>
