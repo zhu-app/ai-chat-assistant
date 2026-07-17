@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import html2canvas from 'html2canvas';
 import ComposerBox from '../components/chat/ComposerBox.vue';
 import MessageList from '../components/chat/MessageList.vue';
 import SessionSidebar from '../components/chat/SessionSidebar.vue';
@@ -44,7 +45,9 @@ const {
   agentReview,
   promptOptimize,
   telemetry,
+  tokenStats,
   clearAgentState,
+  clearTokenStats,
 } = useMessages();
 const {
   settings,
@@ -312,6 +315,32 @@ const handleExport = () => {
   a.click();
   URL.revokeObjectURL(url);
 };
+
+// 导出对话为图片
+const isExportingImage = ref(false);
+const handleExportImage = async () => {
+  if (!messages.value.length) return;
+  isExportingImage.value = true;
+  try {
+    const stageEl = document.querySelector('.chat-stage');
+    if (!stageEl) return;
+    const canvas = await html2canvas(stageEl as HTMLElement, {
+      backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim() || '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = `chat-export-${sessionInfo.value?.title || '对话'}-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast.success('对话已导出为图片');
+  } catch {
+    toast.error('图片导出失败');
+  } finally {
+    isExportingImage.value = false;
+  }
+};
 </script>
 
 <template>
@@ -355,8 +384,11 @@ const handleExport = () => {
           </div>
         </div>
         <div class="chat-header__right">
-          <button class="icon-button" title="导出对话" @click="handleExport" :disabled="!hasMessages">
+          <button class="icon-button" title="导出对话(Markdown)" @click="handleExport" :disabled="!hasMessages">
             ⬇
+          </button>
+          <button class="icon-button" title="导出对话(图片)" @click="handleExportImage" :disabled="!hasMessages || isExportingImage">
+            📷
           </button>
           <button
             class="icon-button telemetry-btn"
@@ -427,6 +459,7 @@ const handleExport = () => {
 
     <TelemetryPanel
       :telemetry="telemetry"
+      :token-stats="tokenStats"
       :visible="showTelemetry && hasTelemetry"
       @close="showTelemetry = false"
     />

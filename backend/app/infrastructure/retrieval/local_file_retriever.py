@@ -72,6 +72,10 @@ class LocalFileRetriever(RetrievalRepository):
         if not self.db_path:
             return []
 
+        # 空列表 = 用户没选文档，不搜索任何文档
+        if document_ids is not None and not document_ids:
+            return []
+
         query_terms = self._extract_query_terms(query)
         if not query_terms and not document_ids:
             return []
@@ -88,7 +92,7 @@ class LocalFileRetriever(RetrievalRepository):
                 '''
             ).fetchall()
 
-        filtered_rows = [row for row in rows if not document_ids or row['document_id'] in document_ids]
+        filtered_rows = [row for row in rows if document_ids is None or row['document_id'] in document_ids]
         if not filtered_rows:
             return []
 

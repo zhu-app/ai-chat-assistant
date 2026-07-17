@@ -25,6 +25,20 @@ export const useMessages = () => {
 
   // 遥测数据
   const telemetry = ref<TelemetryData | null>(null);
+  // Token 用量历史累积（跨消息汇总）
+  const telemetryHistory = ref<TelemetryData[]>([]);
+  const tokenStats = computed(() => {
+    const all = telemetryHistory.value;
+    return {
+      totalInputTokens: all.reduce((s, t) => s + (t.inputTokens || 0), 0),
+      totalOutputTokens: all.reduce((s, t) => s + (t.outputTokens || 0), 0),
+      totalCostUsd: all.reduce((s, t) => s + (t.estimatedCostUsd || 0), 0),
+      totalDurationMs: all.reduce((s, t) => s + (t.totalDurationMs || 0), 0),
+      totalMessages: all.length,
+      avgQuality: all.length > 0 ? all.reduce((s, t) => s + (t.qualityScore || 0), 0) / all.length : 0,
+      avgTokensPerSecond: all.length > 0 ? all.reduce((s, t) => s + (t.tokensPerSecond || 0), 0) / all.length : 0,
+    };
+  });
 
   const hasMessages = computed(() => messages.value.length > 0);
 
@@ -122,7 +136,9 @@ export const useMessages = () => {
 
       // 从 message_done 中提取遥测数据
       if (event.meta?.telemetry) {
-        telemetry.value = event.meta.telemetry as TelemetryData;
+        const td = event.meta.telemetry as TelemetryData;
+        telemetry.value = td;
+        telemetryHistory.value = [...telemetryHistory.value, td];
       }
       return;
     }
@@ -257,6 +273,11 @@ export const useMessages = () => {
     telemetry.value = null;
   };
 
+  const clearTokenStats = () => {
+    telemetryHistory.value = [];
+    telemetry.value = null;
+  };
+
   return {
     messages,
     hasMessages,
@@ -272,6 +293,9 @@ export const useMessages = () => {
     promptOptimize,
     // 遥测数据
     telemetry,
+    telemetryHistory,
+    tokenStats,
     clearAgentState,
+    clearTokenStats,
   };
 };

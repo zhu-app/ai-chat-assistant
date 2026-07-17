@@ -140,13 +140,6 @@ class ChatService:
 
         # ── 阶段 1：Agent 模式（可选） ──
         if settings.enable_agent_mode and self.agent_pipeline:
-            # Agent 模式下，由 AgentPipeline 管理整个流程
-            yield {
-                'type': 'message_started',
-                'sessionId': session.id,
-                'messageId': '',
-            }
-
             # 更新会话元数据
             title = _clean_title(user_message) or '新对话'
             self.session_repository.touch_session(
@@ -161,11 +154,10 @@ class ChatService:
             )
             self.session_repository.save_message(user_entry)
 
-            # 保存 assistant 占位
+            # 先保存 assistant 占位到数据库获取真实 id，再发事件
             assistant_entry = ChatMessage(
                 session_id=session.id, role='assistant', content='', status='streaming'
             )
-            # 先把 assistant 消息保存到数据库（获取真实 id）
             self.session_repository.save_message(assistant_entry)
 
             yield {
@@ -175,6 +167,13 @@ class ChatService:
                     'title': self.session_repository.get_session(session.id).title,
                     'temperature': session.temperature,
                 },
+            }
+
+            # message_started 在 assistant 保存之后发，用真实 id
+            yield {
+                'type': 'message_started',
+                'sessionId': session.id,
+                'messageId': assistant_entry.id,
             }
 
             history = self.session_repository.list_messages(session.id)
@@ -201,6 +200,14 @@ class ChatService:
                     # 透传所有事件到前端
                     yield event
 
+            except asyncio.CancelledError:
+                assistant_entry.status = 'aborted'
+                self.session_repository.save_message(assistant_entry)
+                return
+            except GeneratorExit:
+                assistant_entry.status = 'aborted'
+                self.session_repository.save_message(assistant_entry)
+                return
             except Exception as exc:
                 assistant_entry.status = 'error'
                 self.session_repository.save_message(assistant_entry)

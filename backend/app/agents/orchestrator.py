@@ -140,7 +140,12 @@ class Orchestrator:
     @staticmethod
     def _parse_plan(raw: str, has_rag: bool, has_web_search: bool = False, question: str = '') -> AgentPlan:
         """解析编排器的 JSON 输出。"""
-        json_match = re.search(r'\{[^{}]*\}', raw, re.DOTALL)
+        # 策略1：尝试匹配 ```json ... ``` 代码块
+        json_match = re.search(r'```(?:json)?\s*\n?(\{.*?\})\s*\n?```', raw, re.DOTALL)
+        if not json_match:
+            # 策略2：匹配最外层 { ... }（支持嵌套）
+            json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+
         if not json_match:
             return AgentPlan(
                 steps=[{'agent': 'writer', 'task': '回答用户问题'}],
@@ -148,7 +153,9 @@ class Orchestrator:
             )
 
         try:
-            data = json.loads(json_match.group())
+            # 使用捕获组(group(1))或完整匹配(group())获取 JSON 字符串
+            json_str = json_match.group(1) if json_match.lastindex else json_match.group()
+            data = json.loads(json_str)
             plan = data.get('plan', [])
             reason = data.get('reason', '')
 

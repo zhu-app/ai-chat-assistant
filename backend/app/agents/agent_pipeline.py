@@ -1,13 +1,14 @@
 """
-Agent 流水线 — 统筹编排器的计划，并行/顺序执行 Agent，流式输出结果。
+Agent 流水线 — 统筹编排器的计划，并行执行 Agent，流式输出结果。
 
 执行流程:
 1. 编排器分析问题 → 生成执行计划
-2. 非 writer Agent 顺序执行（如 search、analyst、code）
-3. writer Agent 将所有输出合成为最终回答（流式）
+2. 非 writer Agent **并行执行**（search、analyst、code 等同时运行）
+3. writer Agent 将所有输出合成为最终回答（真正流式）
 4. reviewer Agent 可选审查最终回答质量
 """
 
+import asyncio
 from typing import AsyncIterator
 
 from app.agents.analyst_agent import AnalystAgent
@@ -37,7 +38,7 @@ def _extract_history_text(history: list) -> str:
 
 
 class AgentPipeline:
-    """Agent 流水线：编排 -> 执行 -> 合成 -> 审查"""
+    """Agent 流水线：编排 -> 并行执行 -> 合成 -> 审查"""
 
     def __init__(
         self,
@@ -85,9 +86,9 @@ class AgentPipeline:
             },
         }
 
-        # 2. 检索阶段
+        # 2. 检索阶段（与 Agent 执行解耦，提前完成）
         retrieved_chunks: list[RetrievedChunk] = []
-        if plan.has_agent('search') and self.retriever and settings.use_rag:
+        if settings.use_rag and self.retriever and settings.document_ids:
             retrieved_chunks = self.retriever.retrieve(question, settings.document_ids)
 
         ctx = AgentContext(
@@ -98,14 +99,13 @@ class AgentPipeline:
             model=settings.model,
         )
 
-        # 3. 执行非 writer Agent（顺序执行保持清晰的事件流）
+        # 3. 并行执行所有非 writer Agent
         execution_agents = [s for s in plan.steps if s['agent'] != 'writer']
-        agent_outputs: dict[str, str] = {}
 
+        # 先发送所有 start 事件
         for step in execution_agents:
             agent_name = step['agent']
             agent = self._agent_map.get(agent_name)
-
             yield {
                 'type': 'agent_step_start',
                 'meta': {
@@ -115,19 +115,28 @@ class AgentPipeline:
                 },
             }
 
-            is_error = False
-            result = ''
-            if agent:
-                try:
-                    result = await agent.execute(ctx)
-                except Exception as exc:
-                    result = f'执行出错：{exc}'
-                    is_error = True
-            else:
-                result = f'Agent "{agent_name}" 未注册'
-                is_error = True
+        # 并行执行所有 Agent
+        async def _run_agent(step: dict):
+            agent_name = step['agent']
+            agent = self._agent_map.get(agent_name)
+            if not agent:
+                return agent_name, f'Agent "{agent_name}" 未注册', True
+            try:
+                result = await agent.execute(ctx)
+                return agent_name, result, False
+            except Exception as exc:
+                return agent_name, f'执行出错：{exc}', True
 
+        agent_results = await asyncio.gather(
+            *[_run_agent(step) for step in execution_agents],
+            return_exceptions=False,
+        )
+
+        # 收集结果 + 发送 done 事件
+        agent_outputs: dict[str, str] = {}
+        for agent_name, result, is_error in agent_results:
             agent_outputs[agent_name] = result
+            agent = self._agent_map.get(agent_name)
             yield {
                 'type': 'agent_step_done',
                 'meta': {
@@ -137,7 +146,7 @@ class AgentPipeline:
                 },
             }
 
-        # 4. 合成阶段（流式）
+        # 4. 合成阶段（真正的流式输出）
         yield {
             'type': 'agent_step_start',
             'meta': {

@@ -46,8 +46,14 @@ class VectorRetriever(RetrievalRepository):
         with sqlite3.connect(self.db_path) as connection:
             connection.row_factory = sqlite3.Row
             connection.execute('PRAGMA journal_mode=WAL')
-            # 将 document_ids 过滤下推到 SQL 层，避免全表扫描
-            if document_ids:
+            # document_ids 语义：
+            #   None    → 搜索所有文档
+            #   []      → 不搜索任何文档（用户没选文档）
+            #   [id..]  → 只搜索这些文档
+            if document_ids is not None and not document_ids:
+                # 空列表：用户没选文档，直接返回空
+                return []
+            if document_ids is not None:
                 placeholders = ','.join('?' * len(document_ids))
                 params: list[Any] = document_ids
                 rows = connection.execute(

@@ -1,3 +1,5 @@
+from typing import AsyncIterator
+
 from app.core.config import settings as app_settings
 from app.domain import ChatMessage, SessionSettings
 from app.llm.providers.base import ChatProvider
@@ -51,8 +53,8 @@ class OpenAICompatibleChatProvider(ChatProvider):
                 base_url=app_settings.openai_base_url,
                 temperature=0.7,
                 streaming=True,
-                timeout=60,
-                max_retries=2,
+                timeout=180,
+                max_retries=1,
             )
 
     async def _mock_stream(self, history: list[ChatMessage], context_docs: list[str] | None = None):
@@ -75,6 +77,37 @@ class OpenAICompatibleChatProvider(ChatProvider):
             temperature=settings.temperature,
         )
         messages = build_messages(history, settings, context_docs)
+        async for chunk in client.astream(messages):
+            text = getattr(chunk, 'content', '')
+            if isinstance(text, list):
+                text = ''.join(str(part) for part in text)
+            if text:
+                yield str(text)
+
+    # ── 流式补全：供 Agent Writer 真正的逐 token 流式输出 ──
+    async def stream_complete(
+        self,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.7,
+        model: str = '',
+    ) -> AsyncIterator[str]:
+        """流式 LLM 调用，逐 token 产出。"""
+        if not self.has_remote_model or not self.client:
+            mock = self._mock_complete(system_prompt, user_message)
+            for token in mock.split(' '):
+                yield token + ' '
+
+            return
+
+        client = self.client.bind(
+            model=model or self.default_model,
+            temperature=temperature,
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_message),
+        ]
         async for chunk in client.astream(messages):
             text = getattr(chunk, 'content', '')
             if isinstance(text, list):

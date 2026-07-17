@@ -20,9 +20,20 @@ export interface TelemetryData {
   };
 }
 
+export interface TokenStatsSummary {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  totalDurationMs: number;
+  totalMessages: number;
+  avgQuality: number;
+  avgTokensPerSecond: number;
+}
+
 const props = defineProps<{
   telemetry: TelemetryData | null;
   visible: boolean;
+  tokenStats?: TokenStatsSummary | null;
 }>();
 
 const emit = defineEmits<{
@@ -92,6 +103,25 @@ const formatCost = (usd: number | undefined) => {
         <div class="telemetry-metric">
           <span class="telemetry-metric__value">{{ formatCost(telemetry?.estimatedCostUsd) }}</span>
           <span class="telemetry-metric__label">估算成本</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 累计 Token 用量汇总 -->
+    <div v-if="tokenStats && tokenStats.totalMessages > 0" class="telemetry-section">
+      <div class="telemetry-section__title">📊 累计统计 ({{ tokenStats.totalMessages }} 条消息)</div>
+      <div class="telemetry-metrics">
+        <div class="telemetry-metric">
+          <span class="telemetry-metric__value">{{ (tokenStats.totalInputTokens + tokenStats.totalOutputTokens).toLocaleString() }}</span>
+          <span class="telemetry-metric__label">总Token</span>
+        </div>
+        <div class="telemetry-metric">
+          <span class="telemetry-metric__value">{{ formatCost(tokenStats.totalCostUsd) }}</span>
+          <span class="telemetry-metric__label">总成本</span>
+        </div>
+        <div class="telemetry-metric">
+          <span class="telemetry-metric__value">{{ tokenStats.avgQuality.toFixed(1) }}</span>
+          <span class="telemetry-metric__label">平均质量</span>
         </div>
       </div>
     </div>
