@@ -129,6 +129,13 @@ export const useMessages = () => {
         if (Array.isArray(event.meta?.sources)) {
           target.sources = event.meta.sources as ChatMessage['sources'];
         }
+        // Agent 模式：保存 Agent 执行信息到消息
+        if (agentSteps.value.length > 0) {
+          target.agentInfo = {
+            steps: JSON.parse(JSON.stringify(agentSteps.value)),
+            review: agentReview.value?.review,
+          };
+        }
         messages.value = [...messages.value];
       }
       isStreaming.value = false;

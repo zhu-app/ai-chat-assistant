@@ -63,6 +63,11 @@ const listRef = ref<HTMLDivElement | null>(null);
 const copiedMessageId = ref<string | null>(null);
 const showOptimizedPrompt = ref(false);
 const showAgentDetails = ref(true);
+const expandedAgentMsg = ref<string | null>(null);
+
+const toggleAgentDetail = (msgId: string) => {
+  expandedAgentMsg.value = expandedAgentMsg.value === msgId ? null : msgId;
+};
 
 // 判断消息是否为最后一条用户消息（用于内联显示 Prompt 优化结果）
 // 注意：不能用 index === messages.length-1，因为 assistant 消息在后面追加
@@ -270,6 +275,16 @@ const stepIcon = (status: string) => {
         <div v-if="message.role === 'assistant'" class="message-item__actions">
           <span class="message-item__time">{{ formatTime(message.createdAt) }}</span>
           <div class="message-item__actions-right">
+            <!-- Agent 徽章（签名元素） -->
+            <button
+              v-if="message.agentInfo?.steps?.length"
+              class="agent-badge"
+              :class="{ 'agent-badge--expanded': expandedAgentMsg === message.id }"
+              @click="toggleAgentDetail(message.id)"
+              :title="'查看 Agent 协作详情'"
+            >
+              🤖 <span class="agent-badge__count">{{ message.agentInfo.steps.length }}</span>
+            </button>
             <button type="button" class="message-action" @click="copyMessage(message)">
               {{ copiedMessageId === message.id ? '已复制' : '复制' }}
             </button>
@@ -285,6 +300,20 @@ const stepIcon = (status: string) => {
               分享
             </button>
           </div>
+        </div>
+        <!-- Agent 协作详情（展开后显示） -->
+        <div v-if="message.agentInfo?.steps?.length && expandedAgentMsg === message.id" class="agent-detail">
+          <div class="agent-detail__header">🤖 Agent 协作</div>
+          <div
+            v-for="step in message.agentInfo.steps"
+            :key="step.agent"
+            class="agent-detail__step"
+          >
+            <span class="agent-detail__icon">{{ step.status === 'done' ? '✅' : step.status === 'error' ? '❌' : '⏳' }}</span>
+            <span class="agent-detail__label">{{ step.label }}</span>
+            <span class="agent-detail__task">{{ step.task }}</span>
+          </div>
+          <div v-if="message.agentInfo.review" class="agent-detail__review" v-html="renderMessageContent(message.agentInfo.review)" />
         </div>
       </div>
     </article>

@@ -46,6 +46,10 @@ export interface ChatMessage {
   status: MessageStatus;
   createdAt: string;
   sources?: KnowledgeSource[];
+  agentInfo?: {
+    steps: AgentStep[];
+    review?: string;
+  };
 }
 
 export interface AgentStepMeta {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import html2canvas from 'html2canvas';
 import ComposerBox from '../components/chat/ComposerBox.vue';
 import MessageList from '../components/chat/MessageList.vue';
@@ -329,6 +329,14 @@ const handleExport = () => {
 // 导出对话为图片
 const isExportingImage = ref(false);
 const isSharing = ref(false);
+const showExportMenu = ref(false);
+// 点击空白关闭导出菜单
+const closeExportMenu = (e: MouseEvent) => {
+  const target = e.target as HTMLElement;
+  if (!target.closest('.export-dropdown')) showExportMenu.value = false;
+};
+onMounted(() => document.addEventListener('click', closeExportMenu));
+onUnmounted(() => document.removeEventListener('click', closeExportMenu));
 
 // 分享对话
 const handleShare = async () => {
@@ -416,12 +424,19 @@ const handleExportImage = async () => {
           </div>
         </div>
         <div class="chat-header__right">
-          <button class="icon-button" title="导出对话(Markdown)" @click="handleExport" :disabled="!hasMessages">
-            ⬇
-          </button>
-          <button class="icon-button" title="导出对话(图片)" @click="handleExportImage" :disabled="!hasMessages || isExportingImage">
-            📷
-          </button>
+          <div class="export-dropdown">
+            <button class="icon-button" title="导出对话" :disabled="!hasMessages" @click="showExportMenu = !showExportMenu">
+              ⬇
+            </button>
+            <div v-if="showExportMenu" class="export-dropdown__menu" @click="showExportMenu = false">
+              <button class="export-dropdown__item" @click="handleExport" :disabled="!hasMessages">
+                <span>📝</span> Markdown
+              </button>
+              <button class="export-dropdown__item" @click="handleExportImage" :disabled="!hasMessages || isExportingImage">
+                <span>🖼</span> 图片
+              </button>
+            </div>
+          </div>
           <button
             class="icon-button telemetry-btn"
             :class="{ 'icon-button--active': showTelemetry && hasTelemetry }"
