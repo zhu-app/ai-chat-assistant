@@ -52,7 +52,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   retry: [messageId: string];
+  share: [];
 }>();
+
+const emitShare = () => {
+  emit('share');
+};
 
 const listRef = ref<HTMLDivElement | null>(null);
 const copiedMessageId = ref<string | null>(null);
@@ -198,8 +203,7 @@ const stepIcon = (status: string) => {
 
       <div class="message-item__body">
         <div class="message-item__label">
-          <span>{{ message.role === 'user' ? '你' : 'AI' }}</span>
-          <span class="message-item__time">{{ formatTime(message.createdAt) }}</span>
+          {{ message.role === 'user' ? '你' : 'AI' }}
         </div>
 
         <div class="message-item__bubble">
@@ -264,17 +268,23 @@ const stepIcon = (status: string) => {
         </div>
 
         <div v-if="message.role === 'assistant'" class="message-item__actions">
-          <button type="button" class="message-action" @click="copyMessage(message)">
-            {{ copiedMessageId === message.id ? '已复制' : '复制' }}
-          </button>
-          <button
-            v-if="canRetry(index)"
-            type="button"
-            class="message-action"
-            @click="emit('retry', message.id)"
-          >
-            重试
-          </button>
+          <span class="message-item__time">{{ formatTime(message.createdAt) }}</span>
+          <div class="message-item__actions-right">
+            <button type="button" class="message-action" @click="copyMessage(message)">
+              {{ copiedMessageId === message.id ? '已复制' : '复制' }}
+            </button>
+            <button
+              v-if="canRetry(index)"
+              type="button"
+              class="message-action"
+              @click="emit('retry', message.id)"
+            >
+              重试
+            </button>
+            <button type="button" class="message-action message-action--share" @click="emitShare(message)">
+              分享
+            </button>
+          </div>
         </div>
       </div>
     </article>

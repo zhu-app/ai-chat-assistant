@@ -422,9 +422,6 @@ const handleExportImage = async () => {
           <button class="icon-button" title="导出对话(图片)" @click="handleExportImage" :disabled="!hasMessages || isExportingImage">
             📷
           </button>
-          <button class="icon-button" title="分享对话" @click="handleShare" :disabled="!hasMessages || isSharing || !currentSessionId">
-            🔗
-          </button>
           <button
             class="icon-button telemetry-btn"
             :class="{ 'icon-button--active': showTelemetry && hasTelemetry }"
@@ -458,6 +455,7 @@ const handleExportImage = async () => {
           :is-streaming="isStreaming"
           :enable-prompt-optimizer="settings.enablePromptOptimizer"
           @retry="handleRetry"
+          @share="handleShare"
         />
         <div v-else class="empty-stage">
           <h3>输入你的第一个问题</h3>
