@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import type { KnowledgeDocument, SessionSettings } from '../../types/chat';
 import { readJson, writeJson } from '../../utils/storage';
 
@@ -14,6 +14,7 @@ const emit = defineEmits<{
   update: [value: SessionSettings];
   upload: [files: File[]];
   removeDocument: [documentId: string];
+  openDocumentManager: [];
 }>();
 
 const AVAILABLE_MODELS = [
@@ -22,8 +23,6 @@ const AVAILABLE_MODELS = [
   { value: 'glm-4-air', label: 'GLM-4-Air（轻量🌤）' },
   { value: 'glm-4-long', label: 'GLM-4-Long（长文本📜）' },
 ];
-
-const isDragOver = ref(false);
 
 const updateField = <K extends keyof SessionSettings>(key: K, value: SessionSettings[K]) => {
   emit('update', { ...props.settings, [key]: value });
@@ -63,26 +62,27 @@ const handleUpload = (event: Event) => {
   input.value = '';
 };
 
-const handleDragOver = (e: DragEvent) => {
-  e.preventDefault();
-  isDragOver.value = true;
-};
-
-const handleDragLeave = () => {
-  isDragOver.value = false;
-};
-
-const handleDrop = (e: DragEvent) => {
-  e.preventDefault();
-  isDragOver.value = false;
-  const files = Array.from(e.dataTransfer?.files ?? []);
-  if (files.length) emit('upload', files);
-};
-
 // ── 系统提示词预设 ──
 const presetName = ref('');
 const STORAGE_KEY = 'ai-chat-mvp:prompt-presets';
 const savedPresets = ref<Array<{ name: string; prompt: string }>>(readJson(STORAGE_KEY, []));
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+
+// 从后端加载推荐角色
+const defaultRoles = ref<Array<{ name: string; prompt: string; msg: string }>>([]);
+onMounted(async () => {
+  try {
+    const res = await fetch(`${API_BASE}/templates`);
+    if (res.ok) {
+      const templates = await res.json();
+      defaultRoles.value = templates.map((t: any) => ({
+        name: t.title,
+        prompt: t.system_prompt || '',
+        msg: t.suggested_message || '',
+      }));
+    }
+  } catch { /* ignore */ }
+});
 
 const savePreset = () => {
   const name = presetName.value.trim();
@@ -143,13 +143,30 @@ const deletePreset = (name: string) => {
 
       <!-- 预设 -->
       <div class="preset-area">
-        <div class="preset-area__chips" v-if="savedPresets.length">
-          <button v-for="preset in savedPresets" :key="preset.name"
-            class="preset-chip" :class="{ 'preset-chip--active': settings.systemPrompt === preset.prompt }"
-            @click="applyPreset(preset.prompt)">
-            {{ preset.name }}
-            <span class="preset-chip__del" @click.stop="deletePreset(preset.name)">✕</span>
-          </button>
+        <!-- 推荐角色（从后端加载） -->
+        <div v-if="defaultRoles.length" class="preset-area__group">
+          <div class="preset-area__group-label">推荐角色</div>
+          <div class="preset-area__chips">
+            <button v-for="role in defaultRoles" :key="role.name"
+              class="preset-chip preset-chip--default"
+              :class="{ 'preset-chip--active': settings.systemPrompt === role.prompt }"
+              @click="applyPreset(role.prompt)">
+              {{ role.name }}
+            </button>
+          </div>
+        </div>
+        <!-- 用户自定义预设 -->
+        <div v-if="savedPresets.length" class="preset-area__group">
+          <div class="preset-area__group-label">我的预设</div>
+          <div class="preset-area__chips">
+            <button v-for="preset in savedPresets" :key="preset.name"
+              class="preset-chip"
+              :class="{ 'preset-chip--active': settings.systemPrompt === preset.prompt }"
+              @click="applyPreset(preset.prompt)">
+              {{ preset.name }}
+              <span class="preset-chip__del" @click.stop="deletePreset(preset.name)">✕</span>
+            </button>
+          </div>
         </div>
         <div class="preset-area__save">
           <input class="preset-area__input" v-model="presetName" placeholder="保存当前提示词为预设…" @keydown.enter.prevent="savePreset" />
@@ -189,41 +206,13 @@ const deletePreset = (name: string) => {
     <!-- ═══ 知识库 ═══ -->
     <div class="settings-section">
       <div class="settings-section__title">知识库文档</div>
-
-      <div class="upload-zone" :class="{ 'upload-zone--drag': isDragOver, 'upload-zone--disabled': isUploadingDocuments }"
-        @dragover="handleDragOver" @dragleave="handleDragLeave" @drop="handleDrop"
-        @click="($refs.fileInput as HTMLInputElement)?.click()">
-        <input ref="fileInput" type="file" accept=".txt,.md,.pdf,.docx" multiple hidden :disabled="isUploadingDocuments" @change="handleUpload" />
-        <template v-if="isUploadingDocuments">
-          <span class="upload-zone__icon">⏳</span>
-          <span>上传中…</span>
-        </template>
-        <template v-else-if="isDragOver">
-          <span class="upload-zone__icon">📥</span>
-          <span>松开上传</span>
-        </template>
-        <template v-else>
-          <span class="upload-zone__icon">📄</span>
-          <span>上传文档</span>
-          <small class="upload-zone__hint">txt / md / pdf / docx</small>
-        </template>
-      </div>
-
-      <p v-if="documentError" class="error-banner settings-error">{{ documentError }}</p>
-
-      <div v-if="documents.length" class="document-list">
-        <label v-for="document in documents" :key="document.id" class="document-item">
-          <div class="document-item__main">
-            <input type="checkbox" :checked="settings.documentIds.includes(document.id)" @change="handleDocumentToggle(document.id, $event)" />
-            <div>
-              <strong>{{ document.filename }}</strong>
-              <small>{{ document.status }}</small>
-            </div>
-          </div>
-          <button type="button" class="document-item__remove" @click="emit('removeDocument', document.id)">删除</button>
-        </label>
-      </div>
-      <div v-else class="empty-panel"><small>还没有上传文档</small></div>
+      <button class="settings-btn" @click="emit('openDocumentManager')">
+        📄 管理文档
+        <span v-if="documents.length" class="settings-btn__badge">{{ documents.length }}</span>
+      </button>
+      <small class="field-hint" v-if="documents.length">
+        {{ settings.documentIds.length }} / {{ documents.length }} 个文档已选中
+      </small>
     </div>
   </section>
 </template>

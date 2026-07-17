@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import html2canvas from 'html2canvas';
 import ComposerBox from '../components/chat/ComposerBox.vue';
+import DocumentManager from '../components/chat/DocumentManager.vue';
 import MessageList from '../components/chat/MessageList.vue';
 import SessionSidebar from '../components/chat/SessionSidebar.vue';
 import SettingsPanel from '../components/chat/SettingsPanel.vue';
@@ -354,6 +355,7 @@ const handleExport = () => {
 const isExportingImage = ref(false);
 const isSharing = ref(false);
 const showExportMenu = ref(false);
+const showDocumentManager = ref(false);
 // 点击空白关闭导出菜单
 const closeExportMenu = (e: MouseEvent) => {
   const target = e.target as HTMLElement;
@@ -541,6 +543,24 @@ const handleExportImage = async () => {
       @update="updateSettings"
       @upload="handleUploadDocuments"
       @remove-document="handleRemoveDocument"
+      @open-document-manager="showDocumentManager = true"
+    />
+
+    <DocumentManager
+      v-if="showDocumentManager"
+      :documents="availableDocuments"
+      :selected-ids="settings.documentIds"
+      :is-uploading="isUploadingDocuments"
+      :error="documentError"
+      @close="showDocumentManager = false"
+      @upload="handleUploadDocuments"
+      @remove="handleRemoveDocument"
+      @toggle="(id, checked) => {
+        const next = checked
+          ? [...new Set([...settings.documentIds, id])]
+          : settings.documentIds.filter(d => d !== id);
+        updateSettings({ ...settings, documentIds: next });
+      }"
     />
 
     <TelemetryPanel

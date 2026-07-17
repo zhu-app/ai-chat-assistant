@@ -1912,6 +1912,73 @@ button {
   letter-spacing: 0.04em;
 }
 
+/* ── 设置按钮 ── */
+.settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.settings-btn__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ── 预设区域分组 ── */
+.preset-area__group {
+  display: grid;
+  gap: 4px;
+}
+
+.preset-area__group + .preset-area__group {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light);
+}
+
+.preset-area__group-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.preset-chip--default {
+  border-style: dashed;
+  border-color: var(--border-light);
+  color: var(--text-muted);
+}
+
+.preset-chip--default:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ── 系统提示词预设 ── */
 .preset-area {
   display: grid;
