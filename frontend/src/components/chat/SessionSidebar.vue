@@ -112,7 +112,7 @@ const formatTime = (iso: string) => {
     <div class="sidebar__header">
       <div class="sidebar__brand">
         <span class="sidebar__brand-icon">✦</span>
-        <span class="sidebar__brand-text">灵知</span>
+        <span class="sidebar__brand-text">知聊</span>
       </div>
       <div class="sidebar__header-actions">
         <button class="ghost-button" @click="emit('create')">新建</button>

@@ -1,4 +1,4 @@
-# 灵知 AI 🤖
+# 知聊 AI 🤖
 
 [![在线体验](https://img.shields.io/badge/在线体验-139.199.230.22-blue?style=for-the-badge)](http://139.199.230.22/)
 [![Vue 3](https://img.shields.io/badge/Vue_3-4FC08D?style=for-the-badge&logo=vue.js)](https://vuejs.org)

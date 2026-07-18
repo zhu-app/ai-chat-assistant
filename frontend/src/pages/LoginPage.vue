@@ -49,8 +49,8 @@ const handleGuest = async () => {
     <div class="login-card">
       <div class="login-card__header">
         <div class="login-card__icon">💬</div>
-        <h1>灵知</h1>
-        <p class="login-card__subtitle">智能对话 · 知识库增强</p>
+        <h1>知聊</h1>
+        <p class="login-card__subtitle">知识问答 · 智能对话</p>
       </div>
 
       <form class="login-card__form" @submit.prevent="handleSubmit">
