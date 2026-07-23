@@ -38,3 +38,4 @@ Thumbs.db
 
 # Runtime data (SQLite DB + uploaded documents)
 backend/data/
+.npm-cache/

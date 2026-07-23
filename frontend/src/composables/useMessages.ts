@@ -14,6 +14,7 @@ export const useMessages = () => {
   const isStreaming = ref(false);
   const error = ref<string | null>(null);
   const controller = ref<AbortController | null>(null);
+  let loadVersion = 0;
 
   // Agent 模式状态
   const agentPlan = ref<AgentPlanMeta | null>(null);
@@ -43,11 +44,24 @@ export const useMessages = () => {
   const hasMessages = computed(() => messages.value.length > 0);
 
   const loadMessages = async (sessionId: string | null) => {
+    const version = ++loadVersion;
     if (!sessionId) {
       messages.value = [];
       return;
     }
-    messages.value = await listMessages(sessionId);
+    let loaded: ChatMessage[];
+    try {
+      loaded = await listMessages(sessionId);
+    } catch (reason) {
+      if (version !== loadVersion) return;
+      throw reason;
+    }
+    if (version !== loadVersion) return;
+    messages.value = loaded;
+    telemetryHistory.value = messages.value
+      .map((message) => message.telemetry)
+      .filter((item): item is TelemetryData => !!item);
+    telemetry.value = telemetryHistory.value[telemetryHistory.value.length - 1] ?? null;
   };
 
   const stopStream = () => {
@@ -285,6 +299,17 @@ export const useMessages = () => {
     telemetry.value = null;
   };
 
+  const resetMessages = () => {
+    loadVersion += 1;
+    controller.value?.abort();
+    controller.value = null;
+    messages.value = [];
+    isStreaming.value = false;
+    error.value = null;
+    clearAgentState();
+    clearTokenStats();
+  };
+
   return {
     messages,
     hasMessages,
@@ -304,5 +329,6 @@ export const useMessages = () => {
     tokenStats,
     clearAgentState,
     clearTokenStats,
+    resetMessages,
   };
 };

@@ -35,13 +35,18 @@ type ApiMessage = {
   content: string;
   status: 'pending' | 'streaming' | 'done' | 'error' | 'aborted';
   created_at: string;
+  metadata?: {
+    sources?: ChatMessage['sources'];
+    agentInfo?: ChatMessage['agentInfo'];
+    telemetry?: ChatMessage['telemetry'];
+  };
 };
 
 type ApiDocument = {
   id: string;
   filename: string;
   content_type: string;
-  status: string;
+  status: 'uploaded' | 'processing' | 'ready' | 'error';
   created_at: string;
 };
 
@@ -62,6 +67,9 @@ const toMessage = (item: ApiMessage): ChatMessage => ({
   content: item.content,
   status: item.status,
   createdAt: item.created_at,
+  sources: item.metadata?.sources,
+  agentInfo: item.metadata?.agentInfo,
+  telemetry: item.metadata?.telemetry,
 });
 
 const toDocument = (item: ApiDocument): KnowledgeDocument => ({
@@ -72,7 +80,7 @@ const toDocument = (item: ApiDocument): KnowledgeDocument => ({
   createdAt: item.created_at,
 });
 
-const parseSseChunk = (chunk: string): StreamEvent[] => {
+export const parseSseChunk = (chunk: string): StreamEvent[] => {
   const dataLine = chunk
     .split('\n')
     .find((line) => line.startsWith('data: '));
@@ -93,6 +101,7 @@ const fetchApi = async (url: string, options: RequestInit = {}): Promise<Respons
   if (response.status === 401) {
     localStorage.removeItem('ai-chat-mvp:token');
     localStorage.removeItem('ai-chat-mvp:user');
+    window.dispatchEvent(new CustomEvent('ai-chat:auth-expired'));
   }
   return response;
 };
@@ -172,7 +181,8 @@ export const streamChat = async (
   });
 
   if (!response.ok || !response.body) {
-    throw new Error('流式请求失败');
+    const payload = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(payload?.detail || '流式请求失败');
   }
 
   const reader = response.body.getReader();
@@ -192,4 +202,10 @@ export const streamChat = async (
   if (buffer.trim()) {
     parseSseChunk(buffer).forEach(handlers.onEvent);
   }
+};
+
+export const retryDocument = async (documentId: string): Promise<KnowledgeDocument> => {
+  const response = await fetchApi(`${API_BASE}/documents/${documentId}/retry`, { method: 'POST' });
+  if (!response.ok) throw new Error('Failed to retry document indexing');
+  return toDocument((await response.json()) as ApiDocument);
 };

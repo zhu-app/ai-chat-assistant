@@ -21,7 +21,11 @@ def resolve_backend_path(value: str) -> str:
 
 class Settings(BaseSettings):
     app_name: str = 'AI Chat Assistant'
+    app_environment: str = 'development'
     jwt_secret_key: str = 'change-me-in-production-use-a-random-string'
+    app_admin_usernames: list[str] = Field(default_factory=list)
+    app_allow_registration: bool = True
+    min_password_length: int = 8
     app_cors_origins: list[str] = Field(default_factory=lambda: DEFAULT_CORS_ORIGINS.copy())
     app_log_level: str = 'INFO'
     openai_api_key: str = ''
@@ -39,6 +43,10 @@ class Settings(BaseSettings):
     rag_top_k: int = 4
     rag_embedding_model: str = 'embedding-3'
     rag_embedding_dimensions: int = 128
+    chat_context_max_tokens: int = 6000
+    chat_context_recent_messages: int = 16
+    chat_summary_max_tokens: int = 800
+    share_link_ttl_hours: int = 168
 
     # Prompt 优化引擎
     enable_prompt_optimizer: bool = True
@@ -54,14 +62,18 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# 启动时校验关键配置
-if settings.openai_api_key:
-    _masked_key = settings.openai_api_key[:8] + '...' + settings.openai_api_key[-4:] if len(settings.openai_api_key) > 12 else '***'
-    print(f'[配置] OpenAI API Key: {_masked_key}')
-    print(f'[配置] 模型: {settings.openai_model}')
-else:
-    print('[警告] ⚠️  未配置 OPENAI_API_KEY！所有 AI 回复将使用本地模拟回复，不会调用真实 LLM。')
-    print('[警告]    请创建 backend/.env 文件并填入 OPENAI_API_KEY')
+DEFAULT_JWT_SECRETS = {
+    'change-me-in-production-use-a-random-string',
+    'change-me-to-a-random-string',
+}
 
-if settings.jwt_secret_key == 'change-me-in-production-use-a-random-string':
-    print('[警告] ⚠️  JWT_SECRET_KEY 使用默认值！生产环境务必修改为随机字符串。')
+
+def validate_runtime_settings() -> None:
+    if settings.app_environment.lower() != 'production':
+        return
+    if settings.jwt_secret_key in DEFAULT_JWT_SECRETS or len(settings.jwt_secret_key) < 32:
+        raise RuntimeError('JWT_SECRET_KEY must be a random string of at least 32 characters in production')
+    if not settings.openai_api_key:
+        raise RuntimeError('OPENAI_API_KEY is required in production')
+    if settings.min_password_length < 8:
+        raise RuntimeError('MIN_PASSWORD_LENGTH must be at least 8 in production')

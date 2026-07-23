@@ -2,6 +2,7 @@ export type ChatRole = 'user' | 'assistant' | 'system';
 export type MessageStatus = 'pending' | 'streaming' | 'done' | 'error' | 'aborted';
 
 export interface KnowledgeSource {
+  citation?: string;
   documentId: string;
   filename: string;
   score: number;
@@ -13,7 +14,7 @@ export interface KnowledgeDocument {
   id: string;
   filename: string;
   contentType: string;
-  status: string;
+  status: 'uploaded' | 'processing' | 'ready' | 'error';
   createdAt: string;
 }
 
@@ -50,6 +51,7 @@ export interface ChatMessage {
     steps: AgentStep[];
     review?: string;
   };
+  telemetry?: TelemetryData;
 }
 
 export interface AgentStepMeta {
@@ -84,6 +86,8 @@ export interface TelemetryData {
   ragChunksRetrieved?: number;
   ragTopScore?: number;
   qualityScore?: number;
+  historyMessagesIncluded?: number;
+  historyMessagesOmitted?: number;
   qualityDetails?: {
     accuracy: number;
     completeness: number;

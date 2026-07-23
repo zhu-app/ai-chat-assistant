@@ -34,6 +34,10 @@ class ChatServiceTestCase(unittest.TestCase):
         # 最后两个事件：message_done 然后是 telemetry
         self.assertIn('message_done', event_types[-2:])
         self.assertIn('telemetry', event_types[-2:])
+        assistant = repository.list_messages(events[0]['sessionId'])[-1]
+        self.assertIn('sources', assistant.metadata)
+        self.assertIn('telemetry', assistant.metadata)
+        self.assertGreater(assistant.metadata['telemetry']['inputTokens'], 0)
 
 
 if __name__ == '__main__':

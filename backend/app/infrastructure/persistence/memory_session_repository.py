@@ -8,6 +8,7 @@ class InMemorySessionRepository(SessionRepository):
     def __init__(self) -> None:
         self.sessions: dict[str, ChatSession] = {}
         self.messages: dict[str, list[ChatMessage]] = {}
+        self.share_tokens: dict[str, tuple[str, str, bool]] = {}
 
     def list_sessions(self, user_id: str | None = None) -> list[ChatSession]:
         sessions = self.sessions.values()
@@ -42,9 +43,16 @@ class InMemorySessionRepository(SessionRepository):
     def delete_session(self, session_id: str) -> None:
         self.sessions.pop(session_id, None)
         self.messages.pop(session_id, None)
+        self.revoke_share_tokens(session_id)
 
     def save_message(self, message: ChatMessage) -> ChatMessage:
-        self.messages.setdefault(message.session_id, []).append(message)
+        items = self.messages.setdefault(message.session_id, [])
+        for index, current in enumerate(items):
+            if current.id == message.id:
+                items[index] = message
+                break
+        else:
+            items.append(message)
         self.touch_session(message.session_id)
         return message
 
@@ -61,3 +69,21 @@ class InMemorySessionRepository(SessionRepository):
         if temperature is not None:
             session.temperature = temperature
         return session
+
+    def create_share_token(self, token: str, session_id: str, expires_at: str) -> None:
+        self.share_tokens[token] = (session_id, expires_at, False)
+
+    def get_shared_session_id(self, token: str, now: str) -> str | None:
+        shared = self.share_tokens.get(token)
+        if not shared:
+            return None
+        session_id, expires_at, revoked = shared
+        return session_id if not revoked and expires_at > now else None
+
+    def revoke_share_tokens(self, session_id: str) -> int:
+        revoked = 0
+        for token, (shared_session_id, expires_at, is_revoked) in list(self.share_tokens.items()):
+            if shared_session_id == session_id and not is_revoked:
+                self.share_tokens[token] = (shared_session_id, expires_at, True)
+                revoked += 1
+        return revoked

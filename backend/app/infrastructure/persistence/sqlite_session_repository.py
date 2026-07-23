@@ -1,4 +1,7 @@
+import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from app.domain import ChatMessage, ChatSession
@@ -11,12 +14,22 @@ class SqliteSessionRepository(SessionRepository):
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        connection.execute('PRAGMA foreign_keys=ON')
+        connection.execute('PRAGMA busy_timeout=5000')
         connection.execute('PRAGMA journal_mode=WAL')
         connection.execute('PRAGMA synchronous=NORMAL')
-        return connection
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _init_schema(self) -> None:
         with self._connect() as connection:
@@ -40,6 +53,16 @@ class SqliteSessionRepository(SessionRepository):
                     content TEXT NOT NULL,
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS share_tokens (
+                    token TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL DEFAULT '',
+                    revoked_at TEXT,
                     FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 );
                 '''
@@ -50,6 +73,16 @@ class SqliteSessionRepository(SessionRepository):
                     connection.execute(f'ALTER TABLE sessions ADD COLUMN {col} TEXT' if col == 'user_id'
                                        else f'ALTER TABLE sessions ADD COLUMN {col} REAL NOT NULL DEFAULT 0.7')
                 except Exception:
+                    pass
+            connection.execute("UPDATE sessions SET user_id = '' WHERE user_id IS NULL")
+            try:
+                connection.execute("ALTER TABLE messages ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'")
+            except sqlite3.OperationalError:
+                pass
+            for definition in ["expires_at TEXT NOT NULL DEFAULT ''", 'revoked_at TEXT']:
+                try:
+                    connection.execute(f'ALTER TABLE share_tokens ADD COLUMN {definition}')
+                except sqlite3.OperationalError:
                     pass
 
     @staticmethod
@@ -67,6 +100,10 @@ class SqliteSessionRepository(SessionRepository):
 
     @staticmethod
     def _to_message(row: sqlite3.Row) -> ChatMessage:
+        try:
+            metadata = json.loads(row['metadata_json']) if 'metadata_json' in row.keys() else {}
+        except (TypeError, ValueError):
+            metadata = {}
         return ChatMessage(
             id=row['id'],
             session_id=row['session_id'],
@@ -74,6 +111,7 @@ class SqliteSessionRepository(SessionRepository):
             content=row['content'],
             status=row['status'],
             created_at=row['created_at'],
+            metadata=metadata,
         )
 
     def list_sessions(self, user_id: str | None = None) -> list[ChatSession]:
@@ -123,14 +161,15 @@ class SqliteSessionRepository(SessionRepository):
 
     def delete_session(self, session_id: str) -> None:
         with self._connect() as connection:
+            connection.execute('DELETE FROM share_tokens WHERE session_id = ?', (session_id,))
             connection.execute('DELETE FROM messages WHERE session_id = ?', (session_id,))
             connection.execute('DELETE FROM sessions WHERE id = ?', (session_id,))
 
     def save_message(self, message: ChatMessage) -> ChatMessage:
         with self._connect() as connection:
             connection.execute(
-                'INSERT OR REPLACE INTO messages (id, session_id, role, content, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-                (message.id, message.session_id, message.role, message.content, message.status, message.created_at),
+                'INSERT OR REPLACE INTO messages (id, session_id, role, content, status, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (message.id, message.session_id, message.role, message.content, message.status, message.created_at, json.dumps(message.metadata)),
             )
         self.touch_session(message.session_id)
         return message
@@ -162,3 +201,31 @@ class SqliteSessionRepository(SessionRepository):
                 (next_title, next_temp, updated_at, session_id),
             )
         return self.get_session(session_id)
+
+    def create_share_token(self, token: str, session_id: str, expires_at: str) -> None:
+        from app.domain import utc_now
+
+        with self._connect() as connection:
+            connection.execute(
+                'INSERT INTO share_tokens (token, session_id, created_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, NULL)',
+                (token, session_id, utc_now(), expires_at),
+            )
+
+    def get_shared_session_id(self, token: str, now: str) -> str | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                '''SELECT session_id FROM share_tokens
+                   WHERE token = ? AND revoked_at IS NULL AND expires_at > ?''',
+                (token, now),
+            ).fetchone()
+        return str(row['session_id']) if row else None
+
+    def revoke_share_tokens(self, session_id: str) -> int:
+        from app.domain import utc_now
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                'UPDATE share_tokens SET revoked_at = ? WHERE session_id = ? AND revoked_at IS NULL',
+                (utc_now(), session_id),
+            )
+        return cursor.rowcount

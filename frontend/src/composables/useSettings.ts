@@ -1,5 +1,5 @@
-import { ref } from 'vue';
-import { deleteDocument, listDocuments, uploadDocuments } from '../services/chat';
+import { onScopeDispose, ref } from 'vue';
+import { deleteDocument, listDocuments, retryDocument, uploadDocuments } from '../services/chat';
 import type { KnowledgeDocument, SessionSettings } from '../types/chat';
 import { readJson, storageKeys, writeJson } from '../utils/storage';
 
@@ -27,6 +27,23 @@ export const useSettings = () => {
   const availableDocuments = ref<KnowledgeDocument[]>([]);
   const isUploadingDocuments = ref(false);
   const documentError = ref<string | null>(null);
+  let documentPollTimer: ReturnType<typeof setTimeout> | null = null;
+  let documentLoadVersion = 0;
+
+  const scheduleDocumentRefresh = () => {
+    if (documentPollTimer) clearTimeout(documentPollTimer);
+    documentPollTimer = null;
+    if (!availableDocuments.value.some((document) => document.status === 'processing' || document.status === 'uploaded')) {
+      return;
+    }
+    documentPollTimer = setTimeout(async () => {
+      try {
+        await loadDocuments();
+      } catch {
+        documentError.value = 'Failed to refresh document status';
+      }
+    }, 1500);
+  };
 
   const updateSettings = (next: SessionSettings) => {
     settings.value = next;
@@ -34,8 +51,33 @@ export const useSettings = () => {
   };
 
   const loadDocuments = async () => {
+    const version = ++documentLoadVersion;
     documentError.value = null;
-    availableDocuments.value = await listDocuments();
+    let loaded: KnowledgeDocument[];
+    try {
+      loaded = await listDocuments();
+    } catch (reason) {
+      if (version !== documentLoadVersion) return;
+      throw reason;
+    }
+    if (version !== documentLoadVersion) return;
+    availableDocuments.value = loaded;
+    const availableIds = new Set(loaded.map((document) => document.id));
+    const documentIds = settings.value.documentIds.filter((id) => availableIds.has(id));
+    if (documentIds.length !== settings.value.documentIds.length) {
+      settings.value = { ...settings.value, documentIds };
+      persistSettings(settings.value);
+    }
+    scheduleDocumentRefresh();
+  };
+
+  const resetDocuments = () => {
+    documentLoadVersion += 1;
+    if (documentPollTimer) clearTimeout(documentPollTimer);
+    documentPollTimer = null;
+    availableDocuments.value = [];
+    documentError.value = null;
+    isUploadingDocuments.value = false;
   };
 
   const handleUploadDocuments = async (files: File[]) => {
@@ -52,6 +94,7 @@ export const useSettings = () => {
         documentIds: mergedIds,
       };
       persistSettings(settings.value);
+      scheduleDocumentRefresh();
     } catch (error) {
       documentError.value = error instanceof Error ? error.message : '文档上传失败';
     } finally {
@@ -74,6 +117,23 @@ export const useSettings = () => {
     }
   };
 
+  const handleRetryDocument = async (documentId: string) => {
+    documentError.value = null;
+    try {
+      const updated = await retryDocument(documentId);
+      availableDocuments.value = availableDocuments.value.map((item) =>
+        item.id === documentId ? updated : item,
+      );
+      scheduleDocumentRefresh();
+    } catch (error) {
+      documentError.value = error instanceof Error ? error.message : 'Failed to retry document indexing';
+    }
+  };
+
+  onScopeDispose(() => {
+    if (documentPollTimer) clearTimeout(documentPollTimer);
+  });
+
   return {
     settings,
     availableDocuments,
@@ -83,5 +143,7 @@ export const useSettings = () => {
     loadDocuments,
     handleUploadDocuments,
     handleDeleteDocument,
+    handleRetryDocument,
+    resetDocuments,
   };
 };

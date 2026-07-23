@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth import router as auth_router
 from app.api.routes.chat import router as chat_router
 from app.api.routes.health import router as health_router
-from app.core.config import settings
+from app.core.config import settings, validate_runtime_settings
 from app.core.rate_limiter import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ async def _periodic_cleanup():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_runtime_settings()
     # 启动时运行一次清理
     await _cleanup_guest_users()
     # 启动后台定时任务

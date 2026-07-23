@@ -13,6 +13,7 @@ const emit = defineEmits<{
   close: [];
   upload: [files: File[]];
   remove: [documentId: string];
+  retry: [documentId: string];
   toggle: [documentId: string, checked: boolean];
 }>();
 
@@ -54,13 +55,14 @@ const handleDrop = (e: DragEvent) => {
         <p v-if="error" class="error-banner">{{ error }}</p>
         <div v-if="documents.length" class="doc-list">
           <label v-for="doc in documents" :key="doc.id" class="doc-item">
-            <input type="checkbox" :checked="selectedIds.includes(doc.id)"
+            <input type="checkbox" :checked="selectedIds.includes(doc.id)" :disabled="doc.status !== 'ready'"
               @change="emit('toggle', doc.id, ($event.target as HTMLInputElement).checked)" />
             <div class="doc-item__info">
               <strong>{{ doc.filename }}</strong>
-              <small>{{ doc.status === 'ready' ? '✅ 就绪' : doc.status === 'processing' ? '⏳ 处理中' : '❌ 错误' }}</small>
+              <small>{{ doc.status === 'ready' ? '✅ 就绪' : doc.status === 'processing' ? '⏳ 处理中' : doc.status === 'uploaded' ? '⏱️ 排队中' : '❌ 错误' }}</small>
             </div>
-            <button class="doc-item__del" @click="emit('remove', doc.id)">删除</button>
+            <button v-if="doc.status === 'error'" class="doc-item__retry" @click.prevent="emit('retry', doc.id)">重试</button>
+            <button class="doc-item__del" @click.prevent="emit('remove', doc.id)">删除</button>
           </label>
         </div>
         <div v-else class="doc-empty"><p>还没有上传文档</p><small>上传后选中即可用于 RAG 检索</small></div>
@@ -85,6 +87,7 @@ const handleDrop = (e: DragEvent) => {
 .doc-item__info strong { display: block; font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-item__info small { font-size: 11px; color: var(--text-muted); }
 .doc-item__del { padding: 4px 10px; border: 0; border-radius: 6px; font-size: 11px; color: var(--text-muted); background: var(--bg-card); cursor: pointer; transition: all 0.1s ease; flex-shrink: 0; }
+.doc-item__retry { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; color: var(--text-primary); background: var(--bg-secondary); cursor: pointer; flex-shrink: 0; }
 .doc-item__del:hover { color: var(--danger); background: var(--danger-soft); }
 .doc-empty { text-align: center; padding: 20px; color: var(--text-muted); }
 .doc-empty p { margin: 0 0 4px; font-size: 14px; }

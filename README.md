@@ -1,131 +1,88 @@
-# 知聊 AI 🤖
+# AI Chat Assistant
 
-[![在线体验](https://img.shields.io/badge/在线体验-139.199.230.22-blue?style=for-the-badge)](http://139.199.230.22/)
-[![Vue 3](https://img.shields.io/badge/Vue_3-4FC08D?style=for-the-badge&logo=vue.js)](https://vuejs.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker)](https://docker.com)
+一个面向个人和小团队的全栈 AI 聊天助手。项目提供 Vue 3 前端、FastAPI 后端、SQLite 持久化、SSE 流式输出、知识库 RAG、多 Agent 协作、对话分享、响应遥测和 Docker 部署能力。
 
-> 一个生产就绪的全栈 AI 聊天应用，支持多用户、知识库 RAG、流式回复。  
-> 🚀 **核心亮点：Prompt 优化引擎 + Multi-Agent 协作系统 + 知识库 RAG + 对话分享**  
-> 技术栈：**Vue 3 + FastAPI + LangChain + SQLite + Docker**  
-> 🔗 **在线体验**: [http://139.199.230.22/](http://139.199.230.22/)
+## 功能亮点
 
-## 🏗️ 架构
+- 多用户登录、注册和游客模式，支持 JWT 鉴权与登录态过期隔离。
+- 多会话聊天，支持流式回复、停止生成、消息编辑、会话搜索、重命名和导出。
+- 文档知识库 RAG，支持上传 `txt`、`md`、`pdf`、`docx`，后台异步索引并在回答中展示来源。
+- Prompt 优化与 Multi-Agent 协作，可展示 Agent 计划、执行步骤和质量审查结果。
+- 响应遥测面板，展示首字延迟、总耗时、Token 估算、成本估算和质量评分。
+- 只读对话分享链接，支持过期时间和撤销。
+- Markdown 渲染安全过滤、生产配置校验、接口限流、CSP 安全头和游客数据自动清理。
+- Docker Compose 一键部署，内置前端 Nginx 与后端健康检查。
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    用户浏览器                            │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  Vue 3 SPA                                      │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
-│  │  │ 登录/注册  │  │  聊天页面 │  │  设置面板     │  │   │
-│  │  └──────────┘  └──────────┘  └──────────────┘  │   │
-│  └─────────────────────────────────────────────────┘   │
-└───────────────────────┬─────────────────────────────────┘
-                        │ SSE / REST API (JWT Auth)
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  Nginx (反向代理 / 静态文件)                              │
-└───────────────────────┬─────────────────────────────────┘
-                        │
-┌─────────────────────────────────────────────────────────┐
-│  FastAPI Backend (Docker)                               │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐  │
-│  │ Auth API  │  │ Chat API  │  │ Document / RAG API  │  │
-│  │ JWT 登录   │  │ SSE 流式  │  │ 上传/检索           │  │
-│  └──────────┘  └──────────┘  └──────────────────────┘  │
-│                        │                                │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  LangChain + LLM Provider (智谱 GLM-4-Flash)      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                        │                                │
-│  ┌──────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ SQLite   │  │ 文档存储      │  │ 向量索引          │  │
-│  │ 会话/消息  │  │ data/documents│  │ chunk_vectors    │  │
-│  └──────────┘  └──────────────┘  └──────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-```
+## 技术栈
 
-## ✨ 功能特性
+| 模块 | 技术 |
+| --- | --- |
+| 前端 | Vue 3, TypeScript, Vite, Vitest |
+| 后端 | FastAPI, Pydantic, LangChain, python-jose, passlib |
+| LLM | OpenAI 兼容 Chat Completions 接口 |
+| 存储 | SQLite, 本地文档存储 |
+| 部署 | Docker, Docker Compose, Nginx |
 
-| 功能 | 状态 |
-|------|------|
-| 🔐 **用户认证**（JWT 登录/注册/游客） | ✅ |
-| 💬 **多会话管理 + 多轮聊天** | ✅ |
-| ⚡ **SSE 流式回复 + 生成中断** | ✅ |
-| 📚 **RAG 知识库检索**（向量 + 关键词混合） | ✅ |
-| 📄 **文档上传**（txt / md / pdf / docx） | ✅ |
-| 🎨 **Markdown 富文本渲染**（代码高亮 + 表格 + 引用） | ✅ |
-| 🌗 **深色/浅色主题切换** | ✅ |
-| 📱 **移动端响应式**（抽屉式侧栏） | ✅ |
-| ⚙️ **设置持久化**（model / temperature / system prompt 跟随会话） | ✅ |
-| ⏱️ **LLM 超时保护** | ✅ |
-| 🐳 **Docker 容器化部署** | ✅ |
-| 🧪 **单元测试**（后端） | ✅ |
-| ✨ **Prompt 优化引擎** — 自动将模糊提问改写为结构化问题，提升回答质量 | ✅ |
-| 🤖 **Multi-Agent 协作系统** — 编排器 + 多 Agent 并行协作 + 质量审查 | ✅ |
-| 🌐 **联网搜索** — DuckDuckGo 实时搜索，普通模式和 Agent 模式均可用 | ✅ |
-| 📊 **响应遥测** — 首字延迟、Token 统计、成本估算、质量自评 | ✅ |
-| 🔒 **速率限制** — 滑动窗口限流，防止 abuse | ✅ |
-| 🧹 **自动游客清理** — 7 天过期游客自动清理，防止数据库膨胀 | ✅ |
-| 📝 **消息编辑** — 用户消息可二次编辑，修正提问 | ✅ |
-| 🔗 **对话分享** — 生成分享链接，一键复制给他人 | ✅ |
-| 🔍 **会话搜索** — 按标题或消息内容实时搜索（300ms 防抖） | ✅ |
-| ⌨️ **键盘快捷键** — Enter 发送 / Shift+Enter 换行 / Ctrl+↑ 编辑上条 | ✅ |
-| 🕐 **消息时间戳** — 相对时间显示（刚刚 / N 分钟前） | ✅ |
-| 🏠 **欢迎引导页** — 6 个场景模板一键开始对话 | ✅ |
-| 🎭 **系统提示词预设** — 自定义角色预设，本地持久化保存 | ✅ |
-| ✏️ **对话重命名** — 双击侧栏会话名称即可修改 | ✅ |
-| 📦 **对话导出** — Markdown 导出 / 图片导出（html2canvas） | ✅ |
-| 📋 **文档管理对话框** — 独立弹窗管理上传文档 | ✅ |
-| 🤖 **Agent 签名徽章** — 每条 AI 回复标注 Agent 协作详情 | ✅ |
-| 🎛️ **折叠式设置面板** — 分类折叠，节省屏幕空间（1024px 友好） | ✅ |
+## 目录结构
 
-## 🚀 核心新特性
-
-### ✨ Prompt 优化引擎
-
-传统 AI 聊天中，用户输入模糊问题时回答质量往往不佳。Prompt 优化引擎利用 LLM 自身能力，在发送前自动改写用户输入：
-
-| 原始提问 | 优化后 |
-|---------|--------|
-| "讲一下 AI" | "请从定义、发展历程、核心技术、应用场景 4 个方面介绍 AI，每个方面约 200 字" |
-| "Python 怎么样" | "请以资深架构师的角度分析 Python 语言的优势、劣势、适用场景以及与其他语言的对比" |
-
-**技术实现：** 零样本（zero-shot）改写 + 结构化注入 + 角色匹配，无需训练数据
-
-### 🤖 Multi-Agent 协作系统
-
-不再是一个 AI 单打独斗，而是多个专业 Agent 协作完成任务：
-
-```
-用户提问 → 编排器（分析任务类型）
-          ├─ 📚 知识检索 Agent → 搜索相关文档
-          ├─ 🔍 深度分析 Agent → 多维度拆解（背景/方案/利弊/建议）
-          ├─ 💻 代码专家 Agent → 代码编写与解释
-          └─ ✍️ 内容合成 Agent → 整合所有输出 → 流式最终回答
-               └─ ⭐ 质量审查 Agent → 评分 + 改进建议（可选）
+```text
+ai-chat-assistant/
+├── backend/                # FastAPI 后端
+│   ├── app/
+│   │   ├── agents/         # Multi-Agent 编排与执行
+│   │   ├── api/            # REST/SSE 路由和 DTO
+│   │   ├── core/           # 配置、鉴权、限流
+│   │   ├── infrastructure/ # SQLite 持久化实现
+│   │   ├── llm/            # LLM Provider 和 Prompt 处理
+│   │   └── services/       # 聊天、文档、上下文窗口服务
+│   └── tests/              # 后端单元测试
+├── frontend/               # Vue 3 前端
+│   └── src/
+│       ├── components/     # 聊天、设置、登录等组件
+│       ├── composables/    # 状态与业务逻辑
+│       ├── pages/          # 聊天页、登录页、分享页
+│       └── services/       # API Client
+├── deploy/                 # Nginx 配置
+├── .github/workflows/      # CI
+└── docker-compose.yml
 ```
 
-**效果：** 复杂问题回答质量显著提升，所有 Agent 工作流在前端实时可见。
+## 本地开发
 
-## 快速启动（开发环境）
-
-### 后端
+### 1. 后端
 
 ```bash
 cd backend
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# Linux/Mac: source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+
 pip install -r requirements.txt
-# 复制环境变量并填入 API Key
-cp .env.example .env
-# 编辑 backend/.env，填入 OPENAI_API_KEY
+copy .env.example .env
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 前端
+在 `backend/.env` 中至少配置：
+
+```env
+OPENAI_API_KEY=your-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+JWT_SECRET_KEY=change-me-to-a-long-random-secret
+APP_CORS_ORIGINS=["http://127.0.0.1:5173","http://localhost:5173"]
+```
+
+如果想先跑通界面而不调用真实模型，可以开启 Mock：
+
+```env
+LLM_MOCK=true
+```
+
+### 2. 前端
 
 ```bash
 cd frontend
@@ -133,202 +90,137 @@ npm install
 npm run dev
 ```
 
-访问 `http://127.0.0.1:5173`
+浏览器打开：
 
----
+```text
+http://127.0.0.1:5173
+```
 
-## 🐳 Docker 部署（服务器）
+前端默认请求 `/api`。开发环境通常由 Vite 代理或本地反向代理转发到后端；如果需要直连后端，可在前端环境变量中配置：
 
-### 1️⃣ 准备
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000/api
+```
+
+## Docker 部署
+
+准备生产环境变量：
 
 ```bash
-# 1. 克隆代码到服务器
-git clone <你的仓库地址>
-cd ai-chat-assistant
-
-# 2. 配置生产环境变量
 cp backend/.env.production.example backend/.env.production
-# 编辑 backend/.env.production，填入:
-#   - OPENAI_API_KEY=你的API密钥
-#   - APP_CORS_ORIGINS=[“http://你的域名”]
 ```
 
-### 2️⃣ 启动
+编辑 `backend/.env.production`，至少设置：
+
+```env
+OPENAI_API_KEY=your-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+JWT_SECRET_KEY=replace-with-a-long-random-secret
+APP_CORS_ORIGINS=["https://your-domain.com"]
+```
+
+启动：
 
 ```bash
 docker compose up -d --build
 ```
 
-### 3️⃣ 访问
+默认会将前端暴露在宿主机 `80` 端口，后端只在 Compose 网络内暴露 `8000`，由前端 Nginx 转发 `/api`。
 
-浏览器打开 `http://服务器IP` 即可使用。
+## 常用命令
 
-### 4️⃣ 更新版本
-
-```bash
-cd /root/ai-chat-assistant
-git fetch origin
-git reset --hard origin/master
-docker compose up -d --build
-```
-
-### 生产环境注意事项
-
-| 项目 | 建议 |
-|------|------|
-| 🔐 **HTTPS** | 使用 Nginx/Caddy 反向代理 + Let's Encrypt |
-| 🔄 **自动重启** | docker-compose 已配置 `restart: unless-stopped` |
-| 💾 **数据持久化** | SQLite 和上传文档在 `backend/data/` 卷中 |
-| 🔑 **API Key** | 生产环境使用智谱 `GLM-4-Flash`（免费），如需更强模型可换 `GLM-4-Plus` |
-| 🌐 **域名 + HTTPS** | 推荐 Caddy 自动申请 SSL 证书：`your.domain.com { reverse_proxy localhost:80 }` |
-
----
-
-## 用户管理
-
-### 查看所有注册用户
-
-```bash
-sqlite3 backend/data/chat.db "SELECT id, username, created_at FROM users;"
-```
-
-示例输出：
-```
-b7f1a2c3-...|admin|2026-07-07T12:00:00
-e8d4f5g6-...|zhangsan|2026-07-07T14:30:00
-```
-
-### 删除某个用户
-
-```bash
-sqlite3 backend/data/chat.db "DELETE FROM users WHERE username='zhangsan';"
-```
-
-> ⚠️ 删除用户不会自动删除其会话和消息，如需清理：
-> ```bash
-> sqlite3 backend/data/chat.db "DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE user_id='要删除的用户ID');"
-> sqlite3 backend/data/chat.db "DELETE FROM sessions WHERE user_id='要删除的用户ID';"
-> ```
-
-### 查看某个用户的会话数量
-
-```bash
-sqlite3 backend/data/chat.db "SELECT u.username, COUNT(s.id) as sessions FROM users u LEFT JOIN sessions s ON s.user_id=u.id GROUP BY u.id;"
-```
-
----
-
-## 环境变量
-
-### 开发环境（backend/.env）
-
-详见 `backend/.env.example`：
-
-```env
-# ===== 必填 =====
-OPENAI_API_KEY=                           # 你的 API Key
-OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-
-# ===== 模型 =====
-OPENAI_MODEL=glm-4-flash
-
-# ===== JWT 安全 =====
-JWT_SECRET_KEY=change-me-to-a-random-string   # ⚠️ 生产环境务必修改
-
-# ===== CORS =====
-APP_CORS_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"]
-
-# ===== 持久化 =====
-PERSISTENCE_BACKEND=sqlite
-SQLITE_PATH=data/chat.db
-
-# ===== RAG 知识库 =====
-ENABLE_RAG=true
-RAG_CHUNK_SIZE=800
-RAG_CHUNK_OVERLAP=120
-RAG_TOP_K=4
-RAG_EMBEDDING_MODEL=embedding-3
-RAG_EMBEDDING_DIMENSIONS=128
-
-# ===== 文档上传 =====
-MAX_UPLOAD_BYTES=20971520
-ALLOWED_DOCUMENT_EXTENSIONS=[".txt",".md",".pdf",".docx"]
-```
-
-### 生产环境（backend/.env.production）
-
-详见 `backend/.env.production.example`，注意路径使用 Docker 容器内绝对路径：
-
-```env
-# ===== 必填 =====
-OPENAI_API_KEY=                           # ⚠️ 必须填入有效 Key
-OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-
-# ===== 模型 =====
-OPENAI_MODEL=glm-4-flash
-
-# ===== JWT 安全 =====
-JWT_SECRET_KEY=change-me-to-a-random-string   # ⚠️ 务必修改为随机字符串
-
-# ===== CORS =====
-APP_CORS_ORIGINS=["http://your-domain.com","https://your-domain.com"]
-
-# ===== 持久化 =====
-PERSISTENCE_BACKEND=sqlite
-SQLITE_PATH=/app/data/chat.db
-
-# ===== RAG 知识库 =====
-ENABLE_RAG=true
-RAG_SOURCE_DIR=/app/knowledge
-DOCUMENT_STORE_DIR=/app/data/documents
-RAG_CHUNK_SIZE=800
-RAG_CHUNK_OVERLAP=120
-RAG_TOP_K=4
-RAG_EMBEDDING_MODEL=embedding-3
-RAG_EMBEDDING_DIMENSIONS=128
-
-# ===== 文档上传 =====
-MAX_UPLOAD_BYTES=20971520
-ALLOWED_DOCUMENT_EXTENSIONS=[".txt",".md",".pdf",".docx"]
-```
-
----
-
-## RAG 使用方式
-
-1. 启动前后端
-2. 点击右上角 ⚙ 打开设置面板
-3. 在「增强功能」中开启「RAG 知识库」
-4. 在「知识库文档」中点击「管理文档」，上传文件（txt / md / pdf / docx）
-5. 在文档列表中勾选当前会话要参与检索的文档
-6. 提问与文档内容相关的问题
-
----
-
-## 测试
+后端测试：
 
 ```bash
 cd backend
-python -m unittest discover -s tests -p "test_*.py"
+python -m unittest discover -s tests -v
 ```
 
----
+前端测试：
 
-## 后续扩展方向
+```bash
+cd frontend
+npm test -- --run
+```
 
-- [x] **对话导出** — Markdown 导出（✅ 已实现）、图片导出（✅ 已实现，html2canvas）
-- [x] **会话 / 消息搜索** — 后端 API + 前端搜索框（✅ 已实现，300ms 防抖实时搜索）
-- [x] **Token 用量统计** — 前端跨消息累积汇总（✅ 已实现，展示总Token/总成本/平均质量）
-- [x] **消息编辑** — 用户消息可二次编辑（✅ 已实现）
-- [x] **对话分享** — 生成分享链接（✅ 已实现）
-- [x] **键盘快捷键** — Enter 发送 / Shift+Enter 换行 / Ctrl+↑ 编辑上条（✅ 已实现）
-- [x] **消息时间戳** — 相对时间显示（✅ 已实现）
-- [x] **欢迎引导页** — 场景模板快速开始（✅ 已实现）
-- [x] **系统提示词预设** — 本地保存自定义角色（✅ 已实现）
-- [x] **对话重命名** — 双击侧栏会话名称修改（✅ 已实现）
-- [ ] **异步文档索引** — 上传文档后后台异步处理，不阻塞用户
-- [ ] **会话归档** — 自动归档历史会话，保持侧栏整洁
-- [ ] **管理员后台** — 用户管理、Token 用量统计、系统监控面板
-- [ ] **i18n 国际化** — 英文界面支持
+前端构建：
 
+```bash
+cd frontend
+npm run build
+```
 
+Docker 配置检查：
+
+```bash
+docker compose config --quiet
+```
+
+## API 概览
+
+主要接口都挂在 `/api` 下：
+
+| 路径 | 说明 |
+| --- | --- |
+| `POST /api/auth/register` | 注册 |
+| `POST /api/auth/login` | 登录 |
+| `POST /api/auth/guest` | 游客登录 |
+| `GET /api/auth/me` | 当前用户 |
+| `GET /api/sessions` | 会话列表 |
+| `GET /api/sessions/search` | 搜索会话 |
+| `POST /api/sessions` | 创建会话 |
+| `PATCH /api/sessions/{session_id}` | 更新会话标题或设置 |
+| `GET /api/sessions/{session_id}/messages` | 会话消息 |
+| `PATCH /api/sessions/{session_id}/messages/{message_id}` | 编辑用户消息 |
+| `POST /api/chat/stream` | SSE 流式聊天 |
+| `GET /api/documents` | 文档列表 |
+| `POST /api/documents` | 上传文档 |
+| `POST /api/documents/{document_id}/retry` | 重试文档索引 |
+| `DELETE /api/documents/{document_id}` | 删除文档 |
+| `POST /api/sessions/{session_id}/share` | 创建分享链接 |
+| `GET /api/sessions/shared/{share_token}` | 读取分享会话 |
+| `DELETE /api/sessions/{session_id}/share` | 撤销分享链接 |
+| `GET /api/health/live` | 存活检查 |
+| `GET /api/health/ready` | 就绪检查 |
+
+## 环境变量
+
+详细配置见：
+
+- `backend/.env.example`
+- `backend/.env.production.example`
+
+常用配置：
+
+| 变量 | 说明 |
+| --- | --- |
+| `OPENAI_API_KEY` | OpenAI 兼容接口密钥 |
+| `OPENAI_BASE_URL` | OpenAI 兼容接口地址 |
+| `OPENAI_MODEL` | 默认模型 |
+| `LLM_MOCK` | 是否使用 Mock 模型输出 |
+| `JWT_SECRET_KEY` | JWT 签名密钥，生产环境必须替换 |
+| `APP_CORS_ORIGINS` | 允许跨域访问的前端源 |
+| `CHAT_CONTEXT_MAX_TOKENS` | 聊天上下文最大估算 Token |
+| `CHAT_CONTEXT_RECENT_MESSAGES` | 强制保留的最近消息数 |
+| `SHARE_LINK_TTL_HOURS` | 分享链接有效期，默认 168 小时 |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | 普通接口限流 |
+| `AUTH_RATE_LIMIT_REQUESTS_PER_MINUTE` | 登录/注册/游客接口限流 |
+
+## 安全与数据
+
+- 不要提交真实的 `.env`、`.env.production`、数据库或上传文档，仓库已通过 `.gitignore` 忽略这些文件。
+- 生产环境必须更换 `JWT_SECRET_KEY`，并将 `APP_CORS_ORIGINS` 限制为真实域名。
+- 前端 Markdown 输出经过 DOMPurify 过滤，部署 Nginx 也配置了 CSP、安全响应头和静态资源缓存。
+- 游客账号会在后端启动和运行期间定期清理，清理范围包含会话、消息、分享链接、文档、索引和本地文件。
+- SQLite 数据和上传文档默认位于 `backend/data/`，Docker 部署时通过卷挂载持久化。
+
+## 当前状态
+
+本项目已经覆盖主要测试链路：
+
+- 后端单元测试：认证、会话、聊天、文档索引、分享生命周期、上下文窗口、安全配置、游客清理。
+- 前端测试：API Client 登录态过期处理等。
+- 构建检查：`npm run build` 和 `docker compose config --quiet`。
+
+已知的非阻塞优化项：前端生产包中主 chunk 偏大，后续可以按页面和大型依赖做动态拆分。

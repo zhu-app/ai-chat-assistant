@@ -51,17 +51,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_ip = request.client.host if request.client else 'unknown'
 
         # 认证接口更严格限制
-        if request.url.path in ('/api/auth/login', '/api/auth/register'):
+        if request.url.path in ('/api/auth/login', '/api/auth/register', '/api/auth/guest'):
             if not self.auth_limiter.is_allowed(client_ip):
                 return JSONResponse(
                     status_code=429,
                     content={'detail': '请求过于频繁，请稍后再试'},
+                    headers={'Retry-After': str(self.auth_limiter.window_seconds)},
                 )
         elif request.url.path.startswith('/api/'):
             if not self.global_limiter.is_allowed(client_ip):
                 return JSONResponse(
                     status_code=429,
                     content={'detail': '请求过于频繁，请稍后再试'},
+                    headers={'Retry-After': str(self.global_limiter.window_seconds)},
                 )
 
         response = await call_next(request)

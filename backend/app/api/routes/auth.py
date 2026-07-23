@@ -1,21 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.auth import create_access_token, hash_password, verify_password
-from app.core.dependencies import get_current_user, get_user_repository
+from app.core.config import settings
+from app.core.dependencies import get_current_admin, get_current_user, get_user_repository
 from app.repositories.user_repository import UserRepository
 
 router = APIRouter(prefix='/api/auth', tags=['auth'])
 
 
 class RegisterRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=2, max_length=50)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=2, max_length=50)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class AuthResponse(BaseModel):
@@ -38,7 +39,7 @@ class UserListItem(BaseModel):
 @router.get('/users', response_model=list[UserListItem])
 def list_users(
     repo: UserRepository = Depends(get_user_repository),
-    user_id: str = Depends(get_current_user),
+    user_id: str = Depends(get_current_admin),
 ):
     """查看所有已注册用户（需要登录）"""
     users = repo.list_users()
@@ -50,11 +51,18 @@ def list_users(
 
 @router.post('/register', response_model=AuthResponse)
 def register(payload: RegisterRequest, repo: UserRepository = Depends(get_user_repository)):
+    if not settings.app_allow_registration:
+        raise HTTPException(status_code=403, detail='Registration is disabled')
     username = payload.username.strip().lower()
     if len(username) < 2:
         raise HTTPException(status_code=400, detail='用户名至少 2 个字符')
-    if len(payload.password) < 4:
-        raise HTTPException(status_code=400, detail='密码至少 4 个字符')
+    if len(payload.password) < settings.min_password_length:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Password must be at least {settings.min_password_length} characters',
+        )
+    if len(payload.password.encode('utf-8')) > 72:
+        raise HTTPException(status_code=400, detail='Password is too long')
 
     existing = repo.get_by_username(username)
     if existing:

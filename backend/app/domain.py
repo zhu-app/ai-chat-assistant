@@ -65,6 +65,7 @@ class ChatMessage:
     status: MessageStatus = 'done'
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=utc_now)
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass

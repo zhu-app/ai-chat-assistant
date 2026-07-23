@@ -1,5 +1,7 @@
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from app.domain import DocumentChunk, DocumentChunkVector, KnowledgeDocument
@@ -12,12 +14,22 @@ class SqliteDocumentRepository(DocumentRepository):
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        connection.execute('PRAGMA foreign_keys=ON')
+        connection.execute('PRAGMA busy_timeout=5000')
         connection.execute('PRAGMA journal_mode=WAL')
         connection.execute('PRAGMA synchronous=NORMAL')
-        return connection
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _init_schema(self) -> None:
         with self._connect() as connection:
@@ -110,6 +122,65 @@ class SqliteDocumentRepository(DocumentRepository):
             connection.execute('UPDATE documents SET status = ? WHERE id = ?', (status, document_id))
         return self.get_document(document_id)
 
+    def claim_document_index(self, document_id: str) -> KnowledgeDocument | None:
+        with self._connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            cursor = connection.execute(
+                """UPDATE documents SET status = 'processing'
+                   WHERE id = ? AND status IN ('uploaded', 'error')""",
+                (document_id,),
+            )
+            if cursor.rowcount != 1:
+                return None
+            row = connection.execute(
+                'SELECT * FROM documents WHERE id = ?',
+                (document_id,),
+            ).fetchone()
+        return self._to_document(row) if row else None
+
+    def replace_document_index(
+        self,
+        document_id: str,
+        chunks: list[DocumentChunk],
+        vectors: list[DocumentChunkVector],
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            exists = connection.execute(
+                'SELECT 1 FROM documents WHERE id = ?',
+                (document_id,),
+            ).fetchone()
+            if not exists:
+                raise LookupError('Document was deleted while indexing')
+            connection.execute(
+                'DELETE FROM document_chunk_vectors WHERE document_id = ?',
+                (document_id,),
+            )
+            connection.execute(
+                'DELETE FROM document_chunks WHERE document_id = ?',
+                (document_id,),
+            )
+            connection.executemany(
+                'INSERT INTO document_chunks (id, document_id, chunk_index, content, created_at) VALUES (?, ?, ?, ?, ?)',
+                [
+                    (chunk.id, chunk.document_id, chunk.chunk_index, chunk.content, chunk.created_at)
+                    for chunk in chunks
+                ],
+            )
+            connection.executemany(
+                'INSERT INTO document_chunk_vectors (chunk_id, document_id, chunk_index, vector_json, created_at) VALUES (?, ?, ?, ?, ?)',
+                [
+                    (
+                        vector.chunk_id,
+                        vector.document_id,
+                        vector.chunk_index,
+                        json.dumps(vector.vector),
+                        vector.created_at,
+                    )
+                    for vector in vectors
+                ],
+            )
+
     def save_chunks(self, chunks: list[DocumentChunk]) -> None:
         if not chunks:
             return
@@ -145,6 +216,11 @@ class SqliteDocumentRepository(DocumentRepository):
                     for vector in vectors
                 ],
             )
+
+    def clear_document_index(self, document_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute('DELETE FROM document_chunk_vectors WHERE document_id = ?', (document_id,))
+            connection.execute('DELETE FROM document_chunks WHERE document_id = ?', (document_id,))
 
     def delete_document(self, document_id: str) -> KnowledgeDocument | None:
         document = self.get_document(document_id)

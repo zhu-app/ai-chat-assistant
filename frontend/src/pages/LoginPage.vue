@@ -20,6 +20,10 @@ const toggleMode = () => {
 
 const handleSubmit = async () => {
   if (!username.value.trim() || !password.value) return;
+  if (mode.value === 'register' && password.value.length < 8) {
+    authError.value = '密码至少需要 8 个字符';
+    return;
+  }
   if (mode.value === 'register' && password.value !== confirmPassword.value) {
     authError.value = '两次密码不一致';
     return;
@@ -71,7 +75,8 @@ const handleGuest = async () => {
             v-model="password"
             type="password"
             placeholder="输入密码"
-            autocomplete="current-password"
+            :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
+            :minlength="mode === 'register' ? 8 : undefined"
             required
           />
         </label>

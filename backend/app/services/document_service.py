@@ -37,10 +37,17 @@ class DocumentService:
     def list_documents(self, user_id: str | None = None) -> list[KnowledgeDocument]:
         return self.repository.list_documents(user_id=user_id)
 
-    async def upload_documents(self, files: list[UploadFile], user_id: str = '') -> list[KnowledgeDocument]:
+    async def upload_documents(
+        self,
+        files: list[UploadFile],
+        user_id: str = '',
+        defer_indexing: bool = False,
+    ) -> list[KnowledgeDocument]:
         documents: list[KnowledgeDocument] = []
         for file in files:
             document = await self._store_document(file, user_id=user_id)
+            if not defer_indexing:
+                document = self.index_document(document.id) or document
             documents.append(document)
         return documents
 
@@ -76,16 +83,21 @@ class DocumentService:
             status='uploaded',
         )
         self.repository.save_document(document)
-        self.repository.update_document_status(document.id, 'processing')
+        return document
 
+    def index_document(self, document_id: str) -> KnowledgeDocument | None:
+        document = self.repository.claim_document_index(document_id)
+        if not document:
+            return self.repository.get_document(document_id)
+        storage_path = Path(document.storage_path)
         try:
             extracted_text = extract_text_from_upload(document.filename, document.content_type, storage_path)
             chunks = [
                 DocumentChunk(document_id=document.id, chunk_index=index, content=chunk)
                 for index, chunk in enumerate(self._chunk_text(extracted_text))
             ]
-            self.repository.save_chunks(chunks)
-
+            if not chunks:
+                raise DocumentValidationError('No readable text was found in the document')
             vectors = [
                 DocumentChunkVector(
                     chunk_id=chunk.id,
@@ -95,15 +107,24 @@ class DocumentService:
                 )
                 for chunk, vector in zip(chunks, self.embedding_engine.embed_documents([chunk.content for chunk in chunks]))
             ]
-            self.repository.save_chunk_vectors(vectors)
+            if len(vectors) != len(chunks):
+                raise RuntimeError('Embedding engine returned an unexpected vector count')
+            self.repository.replace_document_index(document.id, chunks, vectors)
             logger.info('document indexed', extra={'document_id': document.id, 'filename': document.filename, 'chunks': len(chunks)})
-            return self.repository.update_document_status(document.id, 'ready') or document
+            return self.repository.update_document_status(document.id, 'ready')
         except Exception:
-            self.repository.update_document_status(document.id, 'error')
+            if self.repository.get_document(document.id):
+                self.repository.update_document_status(document.id, 'error')
             logger.exception('document indexing failed', extra={'document_id': document.id, 'filename': document.filename})
-            if storage_path.exists():
-                storage_path.unlink()
-            raise
+            return self.repository.get_document(document.id)
+
+    def retry_document(self, document_id: str, user_id: str = '') -> KnowledgeDocument | None:
+        document = self.repository.get_document(document_id)
+        if not document or (document.user_id and document.user_id != user_id):
+            return None
+        if document.status != 'error':
+            return document
+        return self.repository.update_document_status(document.id, 'uploaded')
 
     def _validate_upload(self, filename: str) -> None:
         if not is_supported_document(filename, settings.allowed_document_extensions):

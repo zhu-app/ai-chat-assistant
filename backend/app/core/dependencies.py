@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 from app.core.auth import decode_access_token
 from app.core.config import settings
@@ -80,6 +80,17 @@ def get_current_user(authorization: str = Header('')) -> str:
     if payload is None or 'sub' not in payload:
         raise HTTPException(status_code=401, detail='token 已过期或无效')
     return str(payload['sub'])
+
+
+def get_current_admin(
+    user_id: str = Depends(get_current_user),
+    repo: UserRepository = Depends(get_user_repository),
+) -> str:
+    user = repo.get_by_id(user_id)
+    allowed = {name.strip().lower() for name in settings.app_admin_usernames}
+    if not user or user.username.lower() not in allowed:
+        raise HTTPException(status_code=403, detail='Administrator access required')
+    return user_id
 
 
 def get_chat_service() -> ChatService:

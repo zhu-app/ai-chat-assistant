@@ -13,6 +13,13 @@ const user = ref<AuthUser | null>(readJson<AuthUser | null>(storageKeys.user, nu
 const authError = ref<string | null>(null);
 const isLoading = ref(false);
 
+export const clearAuthState = () => {
+  token.value = null;
+  user.value = null;
+  localStorage.removeItem(storageKeys.token);
+  localStorage.removeItem(storageKeys.user);
+};
+
 export const useAuth = () => {
   const isLoggedIn = computed(() => !!token.value && !!user.value);
 
@@ -102,10 +109,7 @@ export const useAuth = () => {
   };
 
   const logout = () => {
-    token.value = null;
-    user.value = null;
-    localStorage.removeItem(storageKeys.token);
-    localStorage.removeItem(storageKeys.user);
+    clearAuthState();
   };
 
   return {

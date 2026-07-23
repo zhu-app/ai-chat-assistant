@@ -7,6 +7,7 @@ from app.domain import ChatMessage, RetrievedChunk, SessionSettings
 from app.llm.providers.base import ChatProvider
 from app.repositories.retrieval_repository import RetrievalRepository
 from app.repositories.session_repository import SessionRepository
+from app.services.context_window import ContextWindow, build_context_window
 from app.services.session_service import SessionService
 
 # 单次 token 流超时（秒），防止 LLM 挂死
@@ -80,6 +81,15 @@ class ChatService:
         self.response_evaluator = response_evaluator
 
     @staticmethod
+    def _build_context(history: list[ChatMessage]) -> ContextWindow:
+        return build_context_window(
+            history,
+            max_tokens=app_settings.chat_context_max_tokens,
+            recent_message_limit=app_settings.chat_context_recent_messages,
+            summary_max_tokens=app_settings.chat_summary_max_tokens,
+        )
+
+    @staticmethod
     async def _timeout_stream(stream: AsyncIterator[str]) -> AsyncIterator[str]:
         """为每个 token 添加超时保护，防止 LLM 挂死"""
         try:
@@ -93,19 +103,23 @@ class ChatService:
 
     @staticmethod
     def _format_context_docs(chunks: list[RetrievedChunk]) -> list[str]:
-        return [f'[{chunk.filename}]\n{chunk.content}' for chunk in chunks]
+        return [
+            f'[{index}] {chunk.filename}, chunk {chunk.chunk_index + 1}\n{chunk.content}'
+            for index, chunk in enumerate(chunks, start=1)
+        ]
 
     @staticmethod
     def _format_sources(chunks: list[RetrievedChunk]) -> list[dict]:
         return [
             {
+                'citation': f'[{index}]',
                 'documentId': chunk.document_id,
                 'filename': chunk.filename,
                 'score': chunk.score,
                 'chunkIndex': chunk.chunk_index,
                 'preview': chunk.content[:180],
             }
-            for chunk in chunks
+            for index, chunk in enumerate(chunks, start=1)
         ]
 
     async def stream_chat(
@@ -123,7 +137,7 @@ class ChatService:
 
         # ── 阶段 0：Prompt 优化（可选） ──
         if settings.enable_prompt_optimizer and self.prompt_optimizer:
-            history = self.session_repository.list_messages(session.id)
+            history = self._build_context(self.session_repository.list_messages(session.id)).messages
             opt_result = await self.prompt_optimizer.optimize(user_message, history)
             if not opt_result['skipped'] and opt_result['optimized'] != user_message:
                 user_message = opt_result['optimized']
@@ -176,10 +190,12 @@ class ChatService:
                 'messageId': assistant_entry.id,
             }
 
-            history = self.session_repository.list_messages(session.id)
+            history = self._build_context(self.session_repository.list_messages(session.id)).messages
 
             # 执行 Agent 流水线
             full_response = ''
+            agent_steps: list[dict] = []
+            agent_review = ''
             try:
                 async for event in self.agent_pipeline.stream_execute(
                     question=user_message,
@@ -193,6 +209,35 @@ class ChatService:
                     if event['type'] == 'token':
                         assistant_entry.content += event.get('delta', '')
                         full_response += event.get('delta', '')
+                    elif event['type'] == 'agent_plan':
+                        agent_steps = [
+                            {
+                                'agent': step.get('agent', ''),
+                                'label': step.get('agent', ''),
+                                'task': step.get('task', ''),
+                                'status': 'pending',
+                            }
+                            for step in event.get('meta', {}).get('steps', [])
+                        ]
+                    elif event['type'] == 'agent_step_start':
+                        step_meta = event.get('meta', {})
+                        for step in agent_steps:
+                            if step['agent'] == step_meta.get('agent'):
+                                step.update({
+                                    'label': step_meta.get('label', step['label']),
+                                    'task': step_meta.get('task', step['task']),
+                                    'status': 'running',
+                                })
+                    elif event['type'] == 'agent_step_done':
+                        step_meta = event.get('meta', {})
+                        for step in agent_steps:
+                            if step['agent'] == step_meta.get('agent'):
+                                step.update({
+                                    'status': 'done',
+                                    'summary': step_meta.get('summary', ''),
+                                })
+                    elif event['type'] == 'agent_review':
+                        agent_review = str(event.get('meta', {}).get('review', ''))
                     elif event['type'] == 'agent_synthesized':
                         full_response = event['meta'].get('full_response', '')
                         continue  # 不直接透传此事件给前端
@@ -220,16 +265,23 @@ class ChatService:
                 return
 
             # 完成
-            assistant_entry.content = full_response or assistant_entry.content
-            assistant_entry.status = 'done'
-            self.session_repository.save_message(assistant_entry)
-
             # 获取检索来源
             retrieved_chunks = (
                 self.retriever.retrieve(user_message, settings.document_ids)
                 if settings.use_rag
                 else []
             )
+            sources = self._format_sources(retrieved_chunks)
+            assistant_entry.content = full_response or assistant_entry.content
+            assistant_entry.status = 'done'
+            assistant_entry.metadata = {
+                'sources': sources,
+                'agentInfo': {
+                    'steps': agent_steps,
+                    'review': agent_review,
+                },
+            }
+            self.session_repository.save_message(assistant_entry)
 
             yield {
                 'type': 'message_done',
@@ -237,7 +289,7 @@ class ChatService:
                 'messageId': assistant_entry.id,
                 'meta': {
                     'content': assistant_entry.content,
-                    'sources': self._format_sources(retrieved_chunks),
+                    'sources': sources,
                 },
             }
             return
@@ -269,7 +321,8 @@ class ChatService:
             'messageId': assistant_entry.id,
         }
 
-        history = self.session_repository.list_messages(session.id)
+        context_window = self._build_context(self.session_repository.list_messages(session.id))
+        history = context_window.messages
         retrieved_chunks = self.retriever.retrieve(user_message, settings.document_ids) if settings.use_rag else []
         context_docs = self._format_context_docs(retrieved_chunks)
 
@@ -287,8 +340,8 @@ class ChatService:
         # ── 遥测追踪 ──
         latency = LatencyTracker()
         latency.start()
-        input_text = user_message + '\n'.join(context_docs)
-        input_tokens = TokenCounter.estimate(input_text)
+        input_text = settings.system_prompt + '\n'.join(context_docs)
+        input_tokens = context_window.estimated_tokens + TokenCounter.estimate(input_text)
 
         # 发送遥测初始化事件
         yield {
@@ -299,6 +352,8 @@ class ChatService:
                 'phase': 'start',
                 'inputTokens': input_tokens,
                 'model': settings.model,
+                'historyMessagesIncluded': len(history),
+                'historyMessagesOmitted': context_window.omitted_count,
             },
         }
 
@@ -335,7 +390,6 @@ class ChatService:
 
         latency.stop()
         assistant_entry.status = 'done'
-        self.session_repository.save_message(assistant_entry)
 
         # ── 计算遥测数据 ──
         output_tokens = TokenCounter.estimate(assistant_entry.content)
@@ -375,7 +429,15 @@ class ChatService:
             'embeddingMode': self.retriever.embedding_mode,
             'qualityScore': quality_score,
             'qualityDetails': quality_details,
+            'historyMessagesIncluded': len(history),
+            'historyMessagesOmitted': context_window.omitted_count,
         }
+        sources = self._format_sources(retrieved_chunks)
+        assistant_entry.metadata = {
+            'sources': sources,
+            'telemetry': telemetry_data,
+        }
+        self.session_repository.save_message(assistant_entry)
 
         yield {
             'type': 'message_done',
@@ -383,7 +445,7 @@ class ChatService:
             'messageId': assistant_entry.id,
             'meta': {
                 'content': assistant_entry.content,
-                'sources': self._format_sources(retrieved_chunks),
+                'sources': sources,
                 'telemetry': telemetry_data,
             },
         }

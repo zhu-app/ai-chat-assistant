@@ -1,4 +1,8 @@
 import unittest
+from fastapi import HTTPException
+
+from app.api.routes.auth import RegisterRequest, register
+from app.core.config import settings
 
 
 class AuthCoreTestCase(unittest.TestCase):
@@ -31,6 +35,18 @@ class AuthCoreTestCase(unittest.TestCase):
 
         result = decode_access_token('invalid-token')
         self.assertIsNone(result)
+
+    def test_registration_rejects_short_password(self):
+        class UnusedRepository:
+            pass
+
+        with self.assertRaises(HTTPException) as raised:
+            register(
+                RegisterRequest(username='tester', password='short'),
+                repo=UnusedRepository(),
+            )
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn(str(settings.min_password_length), raised.exception.detail)
 
 
 if __name__ == '__main__':

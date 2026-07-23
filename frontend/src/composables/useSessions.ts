@@ -7,6 +7,7 @@ export const useSessions = () => {
   const sessions = ref<ChatSession[]>([]);
   const currentSessionId = ref<string | null>(localStorage.getItem(storageKeys.currentSessionId));
   const isLoading = ref(false);
+  let loadVersion = 0;
 
   const currentSession = computed(() =>
     sessions.value.find((session) => session.id === currentSessionId.value) ?? null,
@@ -22,15 +23,31 @@ export const useSessions = () => {
   };
 
   const loadSessions = async () => {
+    const version = ++loadVersion;
     isLoading.value = true;
     try {
-      sessions.value = await listSessions();
-      if (!currentSessionId.value && sessions.value[0]) {
-        persistCurrent(sessions.value[0].id);
+      let loaded: ChatSession[];
+      try {
+        loaded = await listSessions();
+      } catch (reason) {
+        if (version !== loadVersion) return;
+        throw reason;
+      }
+      if (version !== loadVersion) return;
+      sessions.value = loaded;
+      if (!sessions.value.some((session) => session.id === currentSessionId.value)) {
+        persistCurrent(sessions.value[0]?.id ?? null);
       }
     } finally {
-      isLoading.value = false;
+      if (version === loadVersion) isLoading.value = false;
     }
+  };
+
+  const resetSessions = () => {
+    loadVersion += 1;
+    sessions.value = [];
+    isLoading.value = false;
+    persistCurrent(null);
   };
 
   const createNewSession = async () => {
@@ -77,5 +94,6 @@ export const useSessions = () => {
     selectSession,
     removeSession,
     upsertSession,
+    resetSessions,
   };
 };

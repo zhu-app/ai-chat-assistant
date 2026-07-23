@@ -1,6 +1,7 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from uuid import uuid4
@@ -13,6 +14,7 @@ from app.domain import SessionSettings
 from app.prompt_templates import get_template, list_templates
 from app.infrastructure.persistence.sqlite_session_repository import SqliteSessionRepository
 from app.llm.streaming import event_stream
+from app.repositories.session_repository import SessionRepository
 from app.services.chat_service import ChatService
 from app.services.document_service import DocumentService, DocumentValidationError
 from app.services.session_service import SessionService
@@ -121,6 +123,7 @@ def list_documents(
 
 @router.post('/documents', response_model=list[KnowledgeDocumentDto])
 async def upload_documents(
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     document_service: DocumentService = Depends(get_document_service),
     user_id: str = Depends(get_current_user),
@@ -128,7 +131,10 @@ async def upload_documents(
     if not files:
         raise HTTPException(status_code=400, detail='请至少上传一个文档')
     try:
-        return await document_service.upload_documents(files, user_id=user_id)
+        documents = await document_service.upload_documents(files, user_id=user_id, defer_indexing=True)
+        for document in documents:
+            background_tasks.add_task(document_service.index_document, document.id)
+        return documents
     except DocumentValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -146,28 +152,39 @@ def delete_document(
     # 如果文档存在但不属于自己，delete_document 返回 None
 
 
+@router.post('/documents/{document_id}/retry', response_model=KnowledgeDocumentDto)
+def retry_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    document_service: DocumentService = Depends(get_document_service),
+    user_id: str = Depends(get_current_user),
+):
+    document = document_service.retry_document(document_id, user_id=user_id)
+    if not document:
+        raise HTTPException(status_code=404, detail='Document not found')
+    if document.status == 'uploaded':
+        background_tasks.add_task(document_service.index_document, document.id)
+    return document
+
+
 @router.post('/sessions/{session_id}/share')
 def share_session(
     session_id: str,
     session_service: SessionService = Depends(get_session_service),
-    session_repository: SqliteSessionRepository = Depends(get_session_repository),
+    session_repository: SessionRepository = Depends(get_session_repository),
     user_id: str = Depends(get_current_user),
 ):
     """生成对话分享链接。"""
     try:
-        # 验证会话所有权
         session_service.require_session_owner(session_id, user_id)
         share_token = str(uuid4())
-        # 创建 share_tokens 表（幂等）
-        with session_repository._connect() as conn:
-            conn.execute('''CREATE TABLE IF NOT EXISTS share_tokens (
-                token TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )''')
-            conn.execute('INSERT OR REPLACE INTO share_tokens (token, session_id, created_at) VALUES (?, ?, datetime("now"))',
-                         (share_token, session_id))
-        return {'shareUrl': f'/share/{share_token}', 'token': share_token}
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.share_link_ttl_hours)
+        session_repository.create_share_token(share_token, session_id, expires_at.isoformat())
+        return {
+            'shareUrl': f'/share/{share_token}',
+            'token': share_token,
+            'expiresAt': expires_at.isoformat(),
+        }
     except AppError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -175,24 +192,38 @@ def share_session(
 @router.get('/sessions/shared/{share_token}')
 def get_shared_session(
     share_token: str,
+    session_repository: SessionRepository = Depends(get_session_repository),
 ):
     """获取分享的对话内容（无需登录）。"""
-    db_path = settings.sqlite_path
-    repo = SqliteSessionRepository(db_path)
-    with repo._connect() as conn:
-        row = conn.execute('SELECT session_id FROM share_tokens WHERE token = ?', (share_token,)).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail='分享链接无效或已过期')
-        session_id = row['session_id']
-    # 直接通过 repository 获取会话和消息（无需登录），绕过 session_service 的权限检查
-    session = repo.get_session(session_id)
+    session_id = session_repository.get_shared_session_id(
+        share_token,
+        datetime.now(timezone.utc).isoformat(),
+    )
+    if not session_id:
+        raise HTTPException(status_code=404, detail='分享链接无效或已过期')
+    session = session_repository.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail='会话不存在')
-    messages = repo.list_messages(session_id)
+    messages = session_repository.list_messages(session_id)
     return {
         'session': {'id': session.id, 'title': session.title},
         'messages': [{'role': m.role, 'content': m.content, 'createdAt': m.created_at} for m in messages],
     }
+
+
+@router.delete('/sessions/{session_id}/share')
+def revoke_session_share(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+    session_repository: SessionRepository = Depends(get_session_repository),
+    user_id: str = Depends(get_current_user),
+):
+    """撤销该会话的所有公开分享链接。"""
+    try:
+        session_service.require_session_owner(session_id, user_id)
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {'revoked': session_repository.revoke_share_tokens(session_id)}
 
 
 @router.get('/templates')
@@ -222,8 +253,28 @@ async def chat_stream(
     payload: ChatStreamRequest,
     request: Request,
     chat_service: ChatService = Depends(get_chat_service),
+    document_service: DocumentService = Depends(get_document_service),
     user_id: str = Depends(get_current_user),
 ):
+    owned_documents = {
+        document.id: document
+        for document in document_service.list_documents(user_id=user_id)
+    }
+    unknown_document_ids = [
+        document_id
+        for document_id in payload.settings.documentIds
+        if document_id not in owned_documents
+    ]
+    if unknown_document_ids:
+        raise HTTPException(status_code=403, detail='One or more documents are not accessible')
+    unavailable_document_ids = [
+        document_id
+        for document_id in payload.settings.documentIds
+        if owned_documents[document_id].status != 'ready'
+    ]
+    if payload.settings.useRag and unavailable_document_ids:
+        raise HTTPException(status_code=409, detail='Selected documents are still being indexed')
+
     settings = SessionSettings(
         model=payload.settings.model,
         temperature=payload.settings.temperature,

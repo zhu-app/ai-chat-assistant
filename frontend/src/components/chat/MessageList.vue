@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import type { AgentPlanMeta, AgentStep, AgentReviewInfo, ChatMessage, PromptOptimizeInfo } from '../../types/chat';
@@ -142,7 +143,13 @@ const renderMessageContent = (content: string): string => {
   if (!content) return '';
   try {
     const html = getMarked().parse(content);
-    return typeof html === 'string' ? html : escapeHtml(content);
+    return typeof html === 'string'
+      ? DOMPurify.sanitize(html, {
+          USE_PROFILES: { html: true },
+          FORBID_TAGS: ['style', 'iframe', 'object', 'embed', 'form'],
+          FORBID_ATTR: ['style'],
+        })
+      : escapeHtml(content);
   } catch {
     return escapeHtml(content);
   }
@@ -288,7 +295,7 @@ const stepIcon = (status: string) => {
             <div class="message-item__source-list">
               <div v-for="source in message.sources" :key="`${message.id}-${source.documentId}-${source.chunkIndex ?? 0}`" class="message-source-card">
                 <div class="message-source-card__main">
-                  <strong>{{ source.filename }}</strong>
+                  <strong>{{ source.citation || `[${(source.chunkIndex ?? 0) + 1}]` }} {{ source.filename }}</strong>
                   <span>片段 {{ (source.chunkIndex ?? 0) + 1 }} · 相关度 {{ Number(source.score ?? 0).toFixed(0) }}</span>
                   <p v-if="source.preview" class="message-source-card__preview">{{ source.preview }}</p>
                 </div>

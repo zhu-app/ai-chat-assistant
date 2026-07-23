@@ -42,6 +42,7 @@ const {
   selectSession,
   removeSession,
   upsertSession,
+  resetSessions,
 } = useSessions();
 const {
   messages,
@@ -59,6 +60,7 @@ const {
   tokenStats,
   clearAgentState,
   clearTokenStats,
+  resetMessages,
 } = useMessages();
 const {
   settings,
@@ -69,6 +71,8 @@ const {
   loadDocuments,
   handleUploadDocuments,
   handleDeleteDocument,
+  handleRetryDocument,
+  resetDocuments,
 } = useSettings();
 const { draft, clearDraft } = useComposer(() => currentSessionId.value);
 
@@ -146,18 +150,43 @@ watch(
   { immediate: true },
 );
 
-onMounted(async () => {
-  // 未登录用户自动以游客模式进入
-  if (!user.value) {
-    await guestLogin();
-  }
+const loadCurrentWorkspace = async () => {
   await loadSessions();
   await loadDocuments();
-  // 新用户没有会话时，自动创建一个新对话
   if (sessions.value.length === 0) {
     await createNewSession();
     await loadSessions();
   }
+};
+
+const resetCurrentWorkspace = () => {
+  resetMessages();
+  resetSessions();
+  resetDocuments();
+};
+
+let recoveringExpiredAuth = false;
+const handleAuthExpired = async () => {
+  if (recoveringExpiredAuth) return;
+  recoveringExpiredAuth = true;
+  resetCurrentWorkspace();
+  logout();
+  try {
+    if (await guestLogin()) {
+      await loadCurrentWorkspace();
+      toast.info('登录已过期，已切换到游客模式');
+    }
+  } finally {
+    recoveringExpiredAuth = false;
+  }
+};
+
+onMounted(async () => {
+  window.addEventListener('ai-chat:auth-expired', handleAuthExpired);
+  if (!user.value) {
+    await guestLogin();
+  }
+  await loadCurrentWorkspace();
   document.documentElement.setAttribute('data-theme', theme.value);
 
   // 检测后端是否为模拟模式
@@ -315,16 +344,19 @@ const handleLogin = () => {
   showLoginModal.value = true;
 };
 
-const handleLoggedIn = () => {
+const handleLoggedIn = async () => {
   showLoginModal.value = false;
+  resetCurrentWorkspace();
+  await loadCurrentWorkspace();
   toast.success('登录成功');
 };
 
 const handleLogout = async () => {
+  resetCurrentWorkspace();
   logout();
   try {
     await guestLogin();
-    await loadSessions();
+    await loadCurrentWorkspace();
     toast.info('已切换到游客模式');
   } catch {
     // 游客模式失败不影响使用
@@ -362,7 +394,10 @@ const closeExportMenu = (e: MouseEvent) => {
   if (!target.closest('.export-dropdown')) showExportMenu.value = false;
 };
 onMounted(() => document.addEventListener('click', closeExportMenu));
-onUnmounted(() => document.removeEventListener('click', closeExportMenu));
+onUnmounted(() => {
+  document.removeEventListener('click', closeExportMenu);
+  window.removeEventListener('ai-chat:auth-expired', handleAuthExpired);
+});
 
 // 分享对话
 const handleShare = async () => {
@@ -555,6 +590,7 @@ const handleExportImage = async () => {
       @close="showDocumentManager = false"
       @upload="handleUploadDocuments"
       @remove="handleRemoveDocument"
+      @retry="handleRetryDocument"
       @toggle="(id, checked) => {
         const next = checked
           ? [...new Set([...settings.documentIds, id])]
