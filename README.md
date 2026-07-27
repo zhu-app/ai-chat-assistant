@@ -141,7 +141,7 @@ python -m unittest discover -s tests -v
 
 ```bash
 cd frontend
-npm test -- --run
+npm test -- --cache=false
 ```
 
 前端构建：
@@ -198,14 +198,14 @@ docker compose config --quiet
 | `OPENAI_API_KEY` | OpenAI 兼容接口密钥 |
 | `OPENAI_BASE_URL` | OpenAI 兼容接口地址 |
 | `OPENAI_MODEL` | 默认模型 |
-| `LLM_MOCK` | 是否使用 Mock 模型输出 |
+| `LLM_MOCK` | 设为 `true` 时强制使用 Mock 模型，不调用真实模型（即使已配置 API Key） |
 | `JWT_SECRET_KEY` | JWT 签名密钥，生产环境必须替换 |
 | `APP_CORS_ORIGINS` | 允许跨域访问的前端源 |
 | `CHAT_CONTEXT_MAX_TOKENS` | 聊天上下文最大估算 Token |
 | `CHAT_CONTEXT_RECENT_MESSAGES` | 强制保留的最近消息数 |
 | `SHARE_LINK_TTL_HOURS` | 分享链接有效期，默认 168 小时 |
-| `RATE_LIMIT_REQUESTS_PER_MINUTE` | 普通接口限流 |
-| `AUTH_RATE_LIMIT_REQUESTS_PER_MINUTE` | 登录/注册/游客接口限流 |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | 普通 API 接口的每分钟限流阈值，默认 `60` |
+| `AUTH_RATE_LIMIT_REQUESTS_PER_MINUTE` | 登录/注册/游客接口的每分钟限流阈值，默认 `10` |
 
 ## 安全与数据
 
@@ -219,8 +219,9 @@ docker compose config --quiet
 
 本项目已经覆盖主要测试链路：
 
-- 后端单元测试：认证、会话、聊天、文档索引、分享生命周期、上下文窗口、安全配置、游客清理。
+- 后端单元测试：认证、会话、聊天、文档索引、分享生命周期、上下文窗口、安全配置、游客清理和限流。
 - 前端测试：API Client 登录态过期处理等。
 - 构建检查：`npm run build` 和 `docker compose config --quiet`。
+- 最近一次验证：后端 20 项测试、前端 2 项测试及 Mock 模式下的登录、会话创建、SSE 流式聊天冒烟流程均已通过。
 
 已知的非阻塞优化项：前端生产包中主 chunk 偏大，后续可以按页面和大型依赖做动态拆分。

@@ -8,6 +8,8 @@ from collections import defaultdict
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.config import settings
+
 
 class RateLimiter:
     """基于滑动窗口的内存速率限制器。"""
@@ -40,15 +42,35 @@ class RateLimiter:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """API 速率限制中间件。"""
 
-    def __init__(self, app, global_limit: int = 60, auth_limit: int = 10, window: int = 60) -> None:
+    def __init__(
+        self,
+        app,
+        global_limit: int | None = None,
+        auth_limit: int | None = None,
+        window: int = 60,
+    ) -> None:
         super().__init__(app)
+        global_limit = global_limit if global_limit is not None else settings.rate_limit_requests_per_minute
+        auth_limit = auth_limit if auth_limit is not None else settings.auth_rate_limit_requests_per_minute
         self.global_limiter = RateLimiter(max_requests=global_limit, window_seconds=window)
         self.auth_limiter = RateLimiter(max_requests=auth_limit, window_seconds=window)
+        self._last_cleanup = time.monotonic()
+
+    def _cleanup_if_due(self) -> None:
+        now = time.monotonic()
+        if now - self._last_cleanup < self.global_limiter.window_seconds:
+            return
+        self.global_limiter.cleanup()
+        self.auth_limiter.cleanup()
+        self._last_cleanup = now
 
     async def dispatch(self, request: Request, call_next):
         from fastapi.responses import JSONResponse
 
-        client_ip = request.client.host if request.client else 'unknown'
+        # Docker deployment only exposes the backend through Nginx, which overwrites
+        # X-Real-IP with the connecting client's address.
+        client_ip = request.headers.get('x-real-ip') or (request.client.host if request.client else 'unknown')
+        self._cleanup_if_due()
 
         # 认证接口更严格限制
         if request.url.path in ('/api/auth/login', '/api/auth/register', '/api/auth/guest'):

@@ -45,7 +45,7 @@ if app_settings.openai_api_key:
 class OpenAICompatibleChatProvider(ChatProvider):
     def __init__(self) -> None:
         self.default_model = app_settings.openai_model
-        self.has_remote_model = bool(app_settings.openai_api_key)
+        self.has_remote_model = bool(app_settings.openai_api_key) and not app_settings.llm_mock
         self.client = None
         if self.has_remote_model:
             self.client = ChatOpenAI(

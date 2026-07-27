@@ -47,7 +47,8 @@ def readiness_check():
                 'is_dir': document_store.is_dir(),
             },
             'llm': {
-                'remote_enabled': bool(settings.openai_api_key),
+                'remote_enabled': bool(settings.openai_api_key) and not settings.llm_mock,
+                'mock_enabled': settings.llm_mock,
                 'model': settings.openai_model,
             },
             'upload': {

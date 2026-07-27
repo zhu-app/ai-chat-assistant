@@ -19,6 +19,19 @@ class SecurityConfigTestCase(unittest.TestCase):
             settings.jwt_secret_key = original_secret
             settings.openai_api_key = original_api_key
 
+    def test_llm_mock_disables_remote_provider_even_with_api_key(self):
+        from app.llm.providers.openai_chat import OpenAICompatibleChatProvider
+
+        original_api_key = settings.openai_api_key
+        original_mock = settings.llm_mock
+        try:
+            settings.openai_api_key = 'configured'
+            settings.llm_mock = True
+            self.assertFalse(OpenAICompatibleChatProvider().has_remote_model)
+        finally:
+            settings.openai_api_key = original_api_key
+            settings.llm_mock = original_mock
+
 
 if __name__ == '__main__':
     unittest.main()

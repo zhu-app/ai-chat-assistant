@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ''
     openai_model: str = 'glm-4-flash'
     openai_base_url: str = 'https://open.bigmodel.cn/api/paas/v4/'
+    llm_mock: bool = False
     persistence_backend: str = 'sqlite'
     sqlite_path: str = resolve_backend_path('data/chat.db')
     enable_rag: bool = False
@@ -47,6 +48,8 @@ class Settings(BaseSettings):
     chat_context_recent_messages: int = 16
     chat_summary_max_tokens: int = 800
     share_link_ttl_hours: int = 168
+    rate_limit_requests_per_minute: int = 60
+    auth_rate_limit_requests_per_minute: int = 10
 
     # Prompt 优化引擎
     enable_prompt_optimizer: bool = True
