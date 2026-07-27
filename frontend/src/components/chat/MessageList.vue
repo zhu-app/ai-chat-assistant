@@ -15,25 +15,28 @@ function getMarked(): Marked {
     markedHighlight({
       langPrefix: 'hljs language-',
       highlight(code: string, lang: string) {
-        if (!hljsLoaded) {
-          if (!hljsLoading) {
-            hljsLoading = true;
-            import('highlight.js').then((mod) => {
-              hljsLoaded = true;
-              window.__hljs = mod.default;
-            });
+        try {
+          const hljs = (window as any).__hljs;
+          if (hljs) {
+            if (lang && hljs.getLanguage(lang)) {
+              return hljs.highlight(code, { language: lang }).value;
+            }
+            return hljs.highlightAuto(code).value;
           }
-          return code;
-        }
-        const hljs = window.__hljs;
-        if (lang && hljs.getLanguage(lang)) {
-          try { return hljs.highlight(code, { language: lang }).value; } catch { /* fallthrough */ }
-        }
-        return hljs.highlightAuto(code).value;
+        } catch { /* fallthrough */ }
+        return code;
       },
     }),
     { gfm: true, breaks: true },
   );
+  // 异步加载 highlight.js，加载后触发重绘
+  if (!hljsLoaded && !hljsLoading) {
+    hljsLoading = true;
+    import('highlight.js').then((mod) => {
+      hljsLoaded = true;
+      (window as any).__hljs = mod.default;
+    });
+  }
   return markedInstance;
 }
 

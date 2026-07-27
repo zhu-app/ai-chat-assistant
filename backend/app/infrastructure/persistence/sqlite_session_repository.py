@@ -185,6 +185,16 @@ class SqliteSessionRepository(SessionRepository):
     def update_message_content(self, message_id: str, content: str) -> None:
         with self._connect() as connection:
             connection.execute('UPDATE messages SET content = ? WHERE id = ?', (content, message_id))
+            # 更新所属会话的 updated_at
+            row = connection.execute(
+                'SELECT session_id FROM messages WHERE id = ?', (message_id,)
+            ).fetchone()
+            if row:
+                from datetime import datetime, timezone
+                connection.execute(
+                    'UPDATE sessions SET updated_at = ? WHERE id = ?',
+                    (datetime.now(timezone.utc).isoformat(), row['session_id']),
+                )
 
     def touch_session(self, session_id: str, title: str | None = None, temperature: float | None = None) -> ChatSession | None:
         session = self.get_session(session_id)
@@ -224,8 +234,11 @@ class SqliteSessionRepository(SessionRepository):
         from app.domain import utc_now
 
         with self._connect() as connection:
-            cursor = connection.execute(
+            connection.execute(
                 'UPDATE share_tokens SET revoked_at = ? WHERE session_id = ? AND revoked_at IS NULL',
                 (utc_now(), session_id),
             )
-        return cursor.rowcount
+            count = connection.execute(
+                'SELECT changes()'
+            ).fetchone()[0]
+        return count

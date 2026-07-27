@@ -1,8 +1,55 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import DOMPurify from 'dompurify';
+import { Marked } from 'marked';
+import { markedHighlight } from 'marked-highlight';
 
 const props = defineProps<{ token: string }>();
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+
+let markedInstance: Marked | null = null;
+
+function getMarked(): Marked {
+  if (markedInstance) return markedInstance;
+  markedInstance = new Marked(
+    markedHighlight({
+      langPrefix: 'hljs language-',
+      highlight(code: string, lang: string) {
+        try {
+          const hljs = (window as any).__hljs;
+          if (hljs && lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(code, { language: lang }).value;
+          }
+          return code;
+        } catch { return code; }
+      },
+    }),
+    { gfm: true, breaks: true },
+  );
+  return markedInstance;
+}
+
+const renderMarkdown = (content: string): string => {
+  if (!content) return '';
+  try {
+    const html = getMarked().parse(content);
+    return typeof html === 'string'
+      ? DOMPurify.sanitize(html, {
+          USE_PROFILES: { html: true },
+          FORBID_TAGS: ['style', 'iframe', 'object', 'embed', 'form'],
+          FORBID_ATTR: ['style'],
+        })
+      : escapeHtml(content);
+  } catch {
+    return escapeHtml(content);
+  }
+};
+
+const escapeHtml = (text: string) => {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
 
 type SharedMessage = {
   role: 'user' | 'assistant' | 'system';
@@ -60,7 +107,7 @@ onMounted(async () => {
             <strong>{{ message.role === 'user' ? '用户' : message.role === 'assistant' ? 'AI' : '系统' }}</strong>
             <time>{{ new Date(message.createdAt).toLocaleString() }}</time>
           </div>
-          <p>{{ message.content }}</p>
+          <div class="shared-message__content" v-html="renderMarkdown(message.content)" />
         </article>
         <p v-if="messages.length === 0" class="shared-state">这段对话还没有消息。</p>
       </div>

@@ -251,6 +251,10 @@ const handleRenameSession = async (sessionId: string, title: string) => {
 const runSend = async (content: string) => {
   const sessionId = currentSessionId.value;
   clearAgentState();
+
+  // 标记是否是在发送中才创建的新会话
+  let newSessionCreated = false;
+
   await sendMessage(
     {
       sessionId,
@@ -258,6 +262,7 @@ const runSend = async (content: string) => {
       settings: settings.value,
     },
     (newSessionId, title) => {
+      newSessionCreated = true;
       upsertSession({
         id: newSessionId,
         title: title ?? '新对话',
@@ -271,7 +276,11 @@ const runSend = async (content: string) => {
   );
 
   await loadSessions();
-  if (sessionId) await loadMessages(sessionId);
+  // 如果原来没有 sessionId（流式创建的新会话），使用 watcher 已加载的消息
+  // 如果原来有 sessionId，重新加载消息确保最新
+  if (sessionId && !newSessionCreated) {
+    await loadMessages(sessionId);
+  }
 };
 
 const handleSend = () => {
@@ -472,7 +481,7 @@ const handleExportImage = async () => {
           </button>
           <div>
             <p class="chat-header__eyebrow">当前会话</p>
-            <h2>{{ sessionInfo?.title || '准备开始新的对话' }}</h2>
+            <h2>{{ sessionInfo?.title && hasMessages ? sessionInfo.title : '准备开始新的对话' }}</h2>
             <p class="chat-header__subline">
               {{
                 settings.useRag
